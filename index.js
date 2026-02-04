@@ -261,7 +261,11 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 if (userState.favorability >= 80) targetUrl = this.avatarImages.love;
                 else targetUrl = this.avatarImages.normal;
             }
-            av.style.backgroundImage = `url('${targetUrl}')`;
+            
+            // 确保图片 URL 正确并强制更新
+            if (targetUrl) {
+                av.style.backgroundImage = `url("${targetUrl}")`;
+            }
         },
 
         lastActivityTime: Date.now(),
@@ -420,7 +424,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
             if (document.getElementById(containerId)) return;
             const glitchLayer = document.createElement('div'); glitchLayer.id = 'lilith-glitch-layer'; glitchLayer.className = 'screen-glitch-layer'; document.body.appendChild(glitchLayer);
             const wrapper = document.createElement('div'); wrapper.id = containerId; wrapper.style.left = '100px'; wrapper.style.top = '100px';
-            const avatar = document.createElement('div'); avatar.id = avatarId;
+            const avatar = document.createElement('div'); avatar.id = avatarId; avatar.className = 'avatar-breathing';
             const panel = document.createElement('div'); panel.id = panelId; panel.style.display = 'none';
             ['mousedown', 'touchstart', 'click'].forEach(evt => panel.addEventListener(evt, e => e.stopPropagation()));
             const muteIcon = AudioSys.muted ? '🔇' : '🔊';
