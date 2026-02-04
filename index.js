@@ -1,5 +1,5 @@
-import { event_types, eventSource, generateRaw, chat, characters } from '../../../../script.js';
-import { extension_settings, saveSettingsObject } from '../../../extensions.js';
+import { event_types, eventSource, generateRaw, chat, characters } from '/script.js';
+import { extension_settings, saveSettingsObject } from '/extensions.js';
 
 (function() {
     'use strict';
@@ -431,11 +431,13 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
 
             const wrapper = document.createElement('div'); 
             wrapper.id = containerId; 
-            wrapper.style.cssText = 'left: 100px; top: 100px; display: flex !important;'; 
+            wrapper.style.cssText = 'left: 100px; top: 100px; display: flex !important; visibility: visible !important; opacity: 1 !important; z-index: 999999 !important;'; 
             
             const avatar = document.createElement('div'); 
             avatar.id = avatarId; 
             avatar.className = 'avatar-breathing';
+            avatar.style.backgroundColor = '#ff0055'; // 初始强制红色，防止图片加载失败看不见
+            avatar.style.boxShadow = '0 0 15px #ff0055';
             
             const panel = document.createElement('div'); 
             panel.id = panelId; 
@@ -946,17 +948,16 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
     // --- ST Extension Loader ---
     function init() {
         console.log("莉莉丝助手: 正在加载接口资源...");
-        assistantManager.initStruct();
-        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
-        eventSource.on(event_types.USER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
+        try {
+            assistantManager.initStruct();
+            eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
+            eventSource.on(event_types.USER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
+            console.log("莉莉丝助手: 事件监听已挂载。");
+        } catch (e) {
+            console.error("莉莉丝助手: 初始化执行失败", e);
+        }
     }
 
-    if (document.readyState === 'complete') {
-        init();
-    } else {
-        jQuery(window).on('load', function() {
-            init();
-        });
-    }
-
+    // 模块模式下直接尝试初始化
+    init();
 })();
