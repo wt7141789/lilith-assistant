@@ -409,3 +409,41 @@ div.lilith-chat-text {
     pointer-events: none;
     z-index: 10;
 }
+
+/* 抽屉栏按钮增强 */
+#lilith-drawer-btn {
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+}
+
+#lilith-drawer-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: 0.5s;
+}
+
+#lilith-drawer-btn:hover::before {
+    transform: translateX(100%);
+}
+
+
+/* ��������ť��ǿ */
+#lilith-drawer-btn {
+    position: relative;
+    overflow: hidden;
+}
+#lilith-drawer-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 0, 85, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: 0.5s;
+}
+#lilith-drawer-btn:hover::before {
+    transform: translateX(100%);
+}
