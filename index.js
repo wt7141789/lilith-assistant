@@ -1,18 +1,12 @@
-import { event_types, eventSource, generateRaw, chat, characters } from '../../../../script.js';
-import { extension_settings, saveSettingsObject } from '../../../extensions.js';
-
 (function() {
     'use strict';
-
-    const pWin = window.parent || window;
-    const pDoc = pWin.document;
 
     // --- 1. 基础常量 ---
     const containerId = 'lilith-wrapper-cn';
     const avatarId = 'lilith-avatar-cn';
     const panelId = 'lilith-panel-cn';
     const bubbleId = 'lilith-bubble-cn';
-    const EXTENSION_NAME = 'lilith_assistant'; 
+    const STORAGE_KEY = 'lilith_data_v23_fix'; 
     const MAX_HISTORY_TRIGGER = 20; // 触发总结的历史条数
     const HISTORY_KEEP = 5; // 总结后保留的近期对话数
 
@@ -127,6 +121,15 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
     [System Note: Use explicit language.]
     `;
 
+    const LILITH_UI_REGEX = {
+        "scriptName": "[UI]Lilith专属UI_Fix",
+        "findRegex": "(\\[莉莉丝\\])\\s*([^\\n]*)",
+        "replaceString": "<div class=\"lilith-chat-ui\"><div class=\"lilith-chat-avatar\"></div><div class=\"lilith-chat-text\">$2</div></div><style>div.lilith-chat-ui{width:100%;max-width:900px;margin:5px 0;background:linear-gradient(90deg,rgba(48,13,28,0.95) 0%,rgba(128,20,60,0.9) 100%);border-left:4px solid #FF69B4;border-right:4px solid #FF69B4;box-shadow:0 0 15px rgba(255,105,180,0.5),inset 0 0 10px rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;padding:10px;overflow:hidden;color:#f0f0f0;font-family:'Inter','Noto Sans SC',sans-serif}div.lilith-chat-avatar{width:60px;height:60px;min-width:60px;background-image:url('https://i.postimg.cc/rmD7bxxH/IMG-20251102-000620.jpg');background-size:cover;background-position:center;border-radius:50%;border:2px solid #FF69B4;margin-right:15px;box-shadow:0 0 10px rgba(255,105,180,0.7)}div.lilith-chat-text{font-size:0.95em;line-height:1.6;font-weight:500;text-shadow:0 0 5px rgba(255,105,180,0.5)}</style>",
+        "placement": [2],
+        "markdownOnly": true,
+        "runOnEdit": true
+    };
+
     // --- 4. 辅助函数 ---
     function getDynamicPersona() {
         const f = userState.favorability;
@@ -144,15 +147,15 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
     }
 
     const AudioSys = {
-        get muted() { return userState.settings.muted; },
-        set muted(val) { userState.settings.muted = val; saveState(); },
+        muted: localStorage.getItem('lilith_muted') === 'true',
         toggleMute() {
             this.muted = !this.muted;
-            pWin.speechSynthesis.cancel();
+            localStorage.setItem('lilith_muted', this.muted);
+            window.speechSynthesis.cancel();
             return this.muted;
         },
         getVoice() {
-            const voices = pWin.speechSynthesis.getVoices();
+            const voices = window.speechSynthesis.getVoices();
             return voices.find(v => v.name.includes("Xiaoyi") && v.name.includes("Neural"))
                     || voices.find(v => v.name.includes("Xiaoyi"))
                     || voices.find(v => v.lang === "zh-CN");
@@ -161,13 +164,13 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
             if (this.muted || !text) return;
             const cleanText = text.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim();
             if (!cleanText) return;
-            pWin.speechSynthesis.cancel();
-            const u = new pWin.SpeechSynthesisUtterance(cleanText);
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(cleanText);
             const voice = this.getVoice();
             if (voice) u.voice = voice;
             u.rate = 1.0; 
             u.pitch = 0.8; 
-            pWin.speechSynthesis.speak(u);
+            window.speechSynthesis.speak(u);
         }
     };
 
@@ -179,32 +182,25 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
         gachaInventory: [], 
         currentFace: 'normal',
         memoryArchive: [],
-        activePersona: 'toxic',
-        chatHistory: [],
-        settings: {
-            apiType: 'st_internal',
-            baseUrl: 'https://generativelanguage.googleapis.com',
-            apiKey: '',
-            model: 'gemini-1.5-flash',
-            muted: false
-        }
+        activePersona: 'toxic'
     };
     
-    if (!extension_settings[EXTENSION_NAME]) {
-        extension_settings[EXTENSION_NAME] = JSON.parse(JSON.stringify(DEFAULT_STATE));
-    }
-    const userState = extension_settings[EXTENSION_NAME];
-    
-    let panelChatHistory = userState.chatHistory || [];
+    let userState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(JSON.stringify(DEFAULT_STATE));
+    if (userState.fatePoints === undefined) userState.fatePoints = 1000;
+    if (userState.gachaInventory === undefined) userState.gachaInventory = [];
+    if (userState.memoryArchive === undefined) userState.memoryArchive = [];
+    if (userState.activePersona === undefined) userState.activePersona = 'toxic';
 
-    function saveState() { 
-        saveSettingsObject(); 
-        updateUI(); 
-    }
+    let panelChatHistory = [];
+    try {
+        const savedChat = localStorage.getItem(STORAGE_KEY + '_chat');
+        if (savedChat) panelChatHistory = JSON.parse(savedChat);
+    } catch(e) { panelChatHistory = []; }
+
+    function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); updateUI(); }
     function saveChat() {
-        if (panelChatHistory.length > 100) panelChatHistory = panelChatHistory.slice(-100);
-        userState.chatHistory = panelChatHistory;
-        saveSettingsObject();
+        if(panelChatHistory.length > 100) panelChatHistory = panelChatHistory.slice(-100);
+        localStorage.setItem(STORAGE_KEY + '_chat', JSON.stringify(panelChatHistory));
     }
     function updateFavor(n) {
         userState.favorability = Math.max(0, Math.min(100, userState.favorability + parseInt(n)));
@@ -219,7 +215,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
 
     function getPageContext(limit = 15) {
         try {
-            const chatDiv = pDoc.getElementById('chat');
+            const chatDiv = document.getElementById('chat');
             if (!chatDiv) return [];
             const messages = Array.from(chatDiv.querySelectorAll('.mes'));
             return messages.slice(-limit).map(msg => {
@@ -231,34 +227,11 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
     }
 
     const assistantManager = {
-        injectCSS() {
-            if (pDoc.getElementById('lilith-styles')) return;
-            const style = pDoc.createElement('style');
-            style.id = 'lilith-styles';
-            style.innerHTML = `
-                :root { --l-main: #ff0055; --l-cyan: #00f3ff; --l-gold: #ffd700; --l-bg: rgba(10, 10, 15, 0.95); --l-panel-w: 320px; }
-                #lilith-wrapper-cn { position: fixed; z-index: 10001; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
-                #lilith-avatar-cn { width: 100px; height: 100px; background-size: cover; background-position: center; background-color: #222; border-radius: 50%; cursor: move; pointer-events: auto; filter: drop-shadow(0 0 10px var(--l-main)); transition: transform 0.2s, filter 0.3s; border: 2px solid var(--l-main); }
-                #lilith-panel-cn { position: absolute; width: var(--l-panel-w); min-height: 450px; background: var(--l-bg); border: 1px solid var(--l-main); border-radius: 8px; display: flex; flex-direction: column; pointer-events: auto; overflow: hidden; backdrop-filter: blur(5px); box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-                .pos-right { left: 110px; } .pos-left { right: 110px; } .pos-top-align { bottom: 0; }
-                .avatar-breathing { animation: breathing 3s ease-in-out infinite; }
-                @keyframes breathing { 0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px var(--l-main)); } 50% { transform: scale(1.05); filter: drop-shadow(0 0 20px var(--l-main)); } }
-                .glitch-anim { animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both; }
-                @keyframes glitch { 0% { transform: translate(0); } 20% { transform: translate(-3px, 3px); } 40% { transform: translate(-3px, -3px); } 60% { transform: translate(3px, 3px); } 80% { transform: translate(3px, -3px); } 100% { transform: translate(0); } }
-                #lilith-bubble-cn { position: absolute; bottom: 110px; background: rgba(0,0,0,0.85); border: 1px solid var(--l-cyan); padding: 8px 12px; border-radius: 4px; color: #fff; font-size: 12px; max-width: 250px; pointer-events: auto; cursor: pointer; animation: bubble-in 0.3s ease-out; z-index: 10002; }
-                .msg { padding: 6px 10px; border-radius: 4px; font-size: 12px; max-width: 85%; line-height: 1.4; margin-bottom: 5px; }
-                .msg.user { align-self: flex-end; background: #222; color: #eee; border-right: 2px solid var(--l-cyan); }
-                .msg.lilith { align-self: flex-start; background: rgba(255,0,85,0.1); color: #ffb3c1; border-left: 2px solid var(--l-main); }
-                .lilith-tab.active { color: var(--l-main); border-bottom: 2px solid var(--l-main); background: rgba(255,0,85,0.05); }
-                .gacha-stage { height: 150px; background: #000; position: relative; overflow: hidden; display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; }
-                .inv-item { font-size: 11px; padding: 2px 5px; border-bottom: 1px solid #222; display: flex; }
-                .branch-card { margin-bottom:8px; padding:10px; border:1px solid; border-left-width:4px; cursor:pointer; transition:0.2s; background: rgba(255,255,255,0.02); }
-                .branch-card:hover { transform: translateX(5px); background: rgba(255,255,255,0.05); }
-            `;
-            pDoc.head.appendChild(style);
-        },
-        get config() {
-            return userState.settings;
+        config: {
+            apiType: localStorage.getItem('lilith_api_type') || 'native',
+            baseUrl: localStorage.getItem('lilith_api_url') || 'https://generativelanguage.googleapis.com',
+            apiKey: localStorage.getItem('lilith_api_key') || '',
+            model: localStorage.getItem('lilith_api_model') || 'gemini-1.5-flash'
         },
 
         avatarImages: {
@@ -273,27 +246,29 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
             disgust:    'https://i.postimg.cc/1RnVQVry/IMG_20260130_143313.png'
         },
 
-        setAvatar(emotionCmd = null) {
-            const av = pDoc.getElementById(avatarId);
+        setAvatar(parentWin, emotionCmd = null) {
+            const av = document.getElementById(avatarId);
             if (!av) return;
             if (emotionCmd) { userState.currentFace = emotionCmd; saveState(); }
             const current = userState.currentFace || 'normal';
-            let targetUrl = this.avatarImages.normal;
+            let targetUrl = assistantManager.avatarImages.normal;
 
-            if (current.includes('angry') || current.includes('S:-')) targetUrl = this.avatarImages.angry;
-            else if (current.includes('speechless') || current.includes('...')) targetUrl = this.avatarImages.speechless;
-            else if (current.includes('mockery') || current.includes('蠢')) targetUrl = this.avatarImages.mockery;
-            else if (current.includes('horny') || current.includes('❤')) targetUrl = this.avatarImages.horny;
-            else if (current.includes('happy') || current.includes('F:+')) targetUrl = this.avatarImages.happy;
-            else if (current.includes('disgust') || current.includes('恶心') || current.includes('变态')) targetUrl = this.avatarImages.disgust;
+            // 增强：使用更健壮的匹配逻辑
+            const face = current.toLowerCase();
+            if (face.includes('angry') || face.includes('s:-')) targetUrl = assistantManager.avatarImages.angry;
+            else if (face.includes('speechless') || face.includes('...') || face.includes('…')) targetUrl = assistantManager.avatarImages.speechless;
+            else if (face.includes('mockery') || face.includes('蠢') || face.includes('杂鱼')) targetUrl = assistantManager.avatarImages.mockery;
+            else if (face.includes('horny') || face.includes('❤') || face.includes('想要')) targetUrl = assistantManager.avatarImages.horny;
+            else if (face.includes('happy') || face.includes('f:+') || face.includes('笑')) targetUrl = assistantManager.avatarImages.happy;
+            else if (face.includes('disgust') || face.includes('恶心') || face.includes('变态')) targetUrl = assistantManager.avatarImages.disgust;
             else {
-                if (userState.favorability >= 80) targetUrl = this.avatarImages.love;
-                else targetUrl = this.avatarImages.normal;
+                if (userState.favorability >= 80) targetUrl = assistantManager.avatarImages.love;
+                else targetUrl = assistantManager.avatarImages.normal;
             }
             
-            // 确保图片 URL 正确并强制更新
+            // 确保 URL 格式正确
             if (targetUrl) {
-                av.style.backgroundImage = `url("${targetUrl}")`;
+                av.style.backgroundImage = `url('${targetUrl}')`;
             }
         },
 
@@ -316,7 +291,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 }
                 return results.sort((a, b) => GachaConfig.tiers[a].prob - GachaConfig.tiers[b].prob);
             },
-            async generateItems(tierList) {
+            async generateItems(parentWin, tierList) {
                 const tierDesc = tierList.map((t, index) => {
                     const info = GachaConfig.tiers[t];
                     return `Item ${index+1}: [Rank: ${info.name}] (Themes: ${info.prompt})`;
@@ -324,7 +299,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 const systemPrompt = `[System Role: Cursed Item Generator]\n[Themes: NSFW, Bizarre, Disgusting, Lewd, Cyberpunk Trash.]\n[Task]: Generate items based on the Rarity List.\n[Rules]:\n1. Descriptions MUST be vulgar, mocking, or erotic. \n2. Output strictly in JSON Array format: [{"name": "...", "desc": "..."}]\n3. Language: Simplified Chinese (Slang).`;
                 const userPrompt = `Generate ${tierList.length} items based on this list:\n${tierDesc}\n\nReturn JSON ONLY.`;
                 try {
-                    const response = await assistantManager.callUniversalAPI(userPrompt, { isChat: false, systemPrompt: systemPrompt });
+                    const response = await assistantManager.callUniversalAPI(parentWin, userPrompt, { isChat: false, systemPrompt: systemPrompt });
                     const jsonStr = response.replace(/```json/g, '').replace(/```/g, '').trim();
                     const items = JSON.parse(jsonStr);
                     return items.map((item, i) => ({ tier: tierList[i], info: GachaConfig.tiers[tierList[i]], name: item.name, desc: item.desc }));
@@ -333,9 +308,9 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                     return tierList.map(t => ({ tier: t, info: GachaConfig.tiers[t], name: "不知名的垃圾", desc: "因为你的运势太差，这东西无法显示。" }));
                 }
             },
-            async doPull(count) {
+            async doPull(parentWin, count) {
                 const totalCost = count * GachaConfig.cost;
-                const stage = pDoc.getElementById('gacha-visual-area');
+                const stage = document.getElementById('gacha-visual-area');
                 if (this.timer) clearTimeout(this.timer);
                 stage.innerHTML = '';
                 if (userState.fatePoints < totalCost) {
@@ -345,23 +320,23 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 }
                 userState.fatePoints -= totalCost;
                 saveState();
-                const fpEl = pDoc.getElementById('gacha-fp-val');
+                const fpEl = document.getElementById('gacha-fp-val');
                 if(fpEl) fpEl.textContent = userState.fatePoints;
-                const inputEl = pDoc.getElementById('manual-fp-input');
+                const inputEl = document.getElementById('manual-fp-input');
                 if(inputEl) inputEl.value = userState.fatePoints;
-                assistantManager.sendToSillyTavern(`/echo [系统] 消耗 ${totalCost} FP`, false);
-                assistantManager.showBubble("扣费指令已填入输入框，请手动确认。");
+                assistantManager.sendToSillyTavern(parentWin, `/echo [系统] 消耗 ${totalCost} FP`, false);
+                assistantManager.showBubble(parentWin, "扣费指令已填入输入框，请手动确认。");
                 stage.innerHTML = `<div class="summon-circle"></div><div style="position:absolute; bottom:10px; width:100%; text-align:center; color:var(--l-cyan); font-size:10px;">❤ 正在榨取命运红线...</div><div id="gacha-flash" class="summon-flash"></div>`;
                 AudioSys.speak("正在翻垃圾堆...稍等。");
                 const tiers = this.calculateTiers(count);
-                const itemPromise = this.generateItems(tiers);
+                const itemPromise = this.generateItems(parentWin, tiers);
                 const minTime = new Promise(r => setTimeout(r, 1500)); 
                 const [items, _] = await Promise.all([itemPromise, minTime]);
-                const flash = pDoc.getElementById('gacha-flash');
+                const flash = document.getElementById('gacha-flash');
                 if(flash) flash.classList.add('flash-anim');
                 setTimeout(() => {
                     stage.innerHTML = '';
-                    const closeBtn = pDoc.createElement('div');
+                    const closeBtn = document.createElement('div');
                     closeBtn.className = 'gacha-close-btn';
                     closeBtn.innerHTML = '✖';
                     closeBtn.onclick = () => { stage.innerHTML = '<div style="color:#444; margin-top:50px;">[ 既然抽完了就滚吧 ]</div>'; if(this.timer) clearTimeout(this.timer); };
@@ -369,7 +344,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                     items.forEach((res, i) => {
                         userState.gachaInventory.push(res);
                         setTimeout(() => {
-                            const card = pDoc.createElement('div');
+                            const card = document.createElement('div');
                             card.className = `gacha-card ${res.tier}`;
                             card.style.animation = 'card-entry 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
                             card.title = res.desc;
@@ -379,34 +354,34 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                         }, i * 150);
                     });
                     saveState();
-                    this.updateInventoryUI();
+                    this.updateInventoryUI(parentWin);
                     AudioSys.speak("也就这种成色，和你真配。");
                     this.timer = setTimeout(() => { stage.innerHTML = '<div style="color:#444; margin-top:50px;">[ 连接中断 ]</div>'; }, 10000 + (count * 150));
                 }, 400);
             },
-            updateInventoryUI() {
-                const list = pDoc.getElementById('gacha-inv-list');
+            updateInventoryUI(parentWin) {
+                const list = document.getElementById('gacha-inv-list');
                 if (!list) return;
                 list.innerHTML = '';
                 [...userState.gachaInventory].reverse().forEach((item) => {
-                    const row = pDoc.createElement('div');
+                    const row = document.createElement('div');
                     row.className = 'inv-item'; row.style.cursor = "help"; row.title = item.desc;
                     row.innerHTML = `<span style="color:${item.info.color}; flex-shrink:0;">[${item.info.name}]</span><span style="margin-left:5px; color:#ddd;">${item.name}</span>`;
                     list.appendChild(row);
                 });
             },
-            claimRewards(manager) {
+            claimRewards(parentWin, manager) {
                 if (userState.gachaInventory.length === 0) { AudioSys.speak("没东西领个屁啊？"); return; }
                 const itemcmds = userState.gachaInventory.map(i => `/echo [获得] <span style="color:${i.info.color}">${i.name}</span>: ${i.desc}`).join('\n');
                 const exportText = `/sys [系统事件] 莉莉丝嫌弃地把这些破烂扔到了你脸上：\n${itemcmds}\n/echo ----------------`.trim();
-                manager.sendToSillyTavern(exportText, false);
-                manager.showBubble("物资清单已填入，自己决定发不发。");
-                userState.gachaInventory = []; saveState(); this.updateInventoryUI();
+                manager.sendToSillyTavern(parentWin, exportText, false);
+                manager.showBubble(parentWin, "物资清单已填入，自己决定发不发。");
+                userState.gachaInventory = []; saveState(); this.updateInventoryUI(parentWin);
             }
         },
 
-        renderMemoryUI() {
-            const container = pDoc.getElementById('memory-container');
+        renderMemoryUI(parentWin) {
+            const container = document.getElementById('memory-container');
             if (!container) return;
             container.innerHTML = '';
             if (userState.memoryArchive.length === 0) {
@@ -414,64 +389,79 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 return;
             }
             [...userState.memoryArchive].reverse().forEach((mem, idx) => {
-                const card = pDoc.createElement('div');
+                const card = document.createElement('div');
                 card.style.cssText = 'background:rgba(255,255,255,0.05); padding:10px; border-left:3px solid #bd00ff; font-size:11px; color:#ccc; line-height:1.4;';
                 card.innerHTML = `<div style="color:#bd00ff; font-weight:bold; margin-bottom:4px;">🔑 记忆碎片 #${userState.memoryArchive.length - idx}</div><div>${mem}</div>`;
                 container.appendChild(card);
             });
         },
 
-        async checkAndSummarize(force = false) {
+        async checkAndSummarize(parentWin, force = false) {
             if (!force && panelChatHistory.length < MAX_HISTORY_TRIGGER) return;
             if (panelChatHistory.length <= HISTORY_KEEP && !force) return;
-            this.showBubble("正在整理肮脏的记忆...", "#bd00ff");
+            this.showBubble(parentWin, "正在整理肮脏的记忆...", "#bd00ff");
             const toSummarize = panelChatHistory.slice(0, Math.max(0, panelChatHistory.length - HISTORY_KEEP));
             const keepHistory = panelChatHistory.slice(Math.max(0, panelChatHistory.length - HISTORY_KEEP));
-            if (toSummarize.length === 0) { this.showBubble("没什么可总结的。", "#f00"); return; }
+            if (toSummarize.length === 0) { this.showBubble(parentWin, "没什么可总结的。", "#f00"); return; }
             const textBlock = toSummarize.map(m => `${m.role}: ${m.content}`).join('\n');
             const prompt = `[System Task: Memory Consolidation]\nSummarize the following conversation in Simplified Chinese.\nFocus on: Key events, User's fetishes revealed, Relationship changes, and Lilith's current mood cause.\nKeep it concise (under 200 words).\nConversation:\n${textBlock}`;
             try {
-                const summary = await this.callUniversalAPI(prompt, { isChat: false, mode: 'memory_internal', systemPrompt: "You are a database system recording events." });
+                const summary = await this.callUniversalAPI(parentWin, prompt, { isChat: false, mode: 'memory_internal', systemPrompt: "You are a database system recording events." });
                 if (summary) {
                     userState.memoryArchive.push(summary.trim());
                     panelChatHistory = keepHistory; saveChat(); saveState();
-                    this.renderMemoryUI(); this.showBubble("记忆已归档。", "#0f0");
-                } else { this.showBubble("记忆总结失败 (API返回空)", "#f00"); }
+                    this.renderMemoryUI(parentWin); this.showBubble(parentWin, "记忆已归档。", "#0f0");
+                } else { this.showBubble(parentWin, "记忆总结失败 (API返回空)", "#f00"); }
             } catch (e) {
                 console.error("Summary failed", e);
-                this.showBubble("记忆总结出错: " + e.message, "#f00");
+                this.showBubble(parentWin, "记忆总结出错: " + e.message, "#f00");
             }
         },
 
-        updateFP(newVal) {
+        installRegex() {
+            if (window.extension_settings && window.extension_settings.regex_scripts) {
+                const scripts = window.extension_settings.regex_scripts;
+                if (!scripts.find(s => s.scriptName === LILITH_UI_REGEX.scriptName)) {
+                    scripts.push(LILITH_UI_REGEX);
+                    if (window.saveSettings) window.saveSettings();
+                    console.log("[Lilith] Regex script installed.");
+                }
+            }
+        },
+
+        updateFP(parentWin, newVal) {
             userState.fatePoints = newVal; saveState();
-            const fpEl = pDoc.getElementById('gacha-fp-val');
+            const fpEl = document.getElementById('gacha-fp-val');
             if (fpEl) { fpEl.textContent = userState.fatePoints; fpEl.style.color = '#00ff00'; setTimeout(() => { fpEl.style.color = 'var(--l-gold)'; }, 800); }
         },
 
-        initStruct() {
-            if (pDoc.getElementById(containerId)) return;
-            console.log("莉莉丝助手: 开始构建 UI 结构...");
+        initStruct(parentWin) {
+            if (document.getElementById(containerId)) return;
             
-            const glitchLayer = pDoc.createElement('div'); 
+            // 确保 context 正确 (如果是 iframe 环境)
+            const doc = document;
+            
+            const glitchLayer = doc.createElement('div'); 
             glitchLayer.id = 'lilith-glitch-layer'; 
             glitchLayer.className = 'screen-glitch-layer'; 
-            pDoc.body.appendChild(glitchLayer);
+            doc.body.appendChild(glitchLayer);
 
-            const wrapper = pDoc.createElement('div'); 
+            const wrapper = doc.createElement('div'); 
             wrapper.id = containerId; 
-            wrapper.style.cssText = 'left: 100px; top: 100px; display: flex !important; visibility: visible !important; opacity: 1 !important; z-index: 999999 !important;'; 
-            
-            const avatar = pDoc.createElement('div'); 
-            avatar.id = avatarId; 
-            avatar.className = 'avatar-breathing';
-            avatar.style.backgroundColor = '#ff0055'; // 初始强制红色，防止图片加载失败看不见
-            avatar.style.boxShadow = '0 0 15px #ff0055';
-            
-            const panel = pDoc.createElement('div'); 
+            wrapper.style.left = '100px'; 
+            wrapper.style.top = '100px';
+
+            const avatar = doc.createElement('div'); 
+            avatar.id = avatarId;
+            // 增强：初始样式补丁，防止加载 CSS 延迟导致不可见
+            avatar.style.width = '100px';
+            avatar.style.height = '100px';
+            avatar.style.display = 'block';
+            avatar.style.backgroundImage = `url('${this.avatarImages.normal}')`;
+
+            const panel = doc.createElement('div'); 
             panel.id = panelId; 
             panel.style.display = 'none';
-            
             ['mousedown', 'touchstart', 'click'].forEach(evt => panel.addEventListener(evt, e => e.stopPropagation()));
             const muteIcon = AudioSys.muted ? '🔇' : '🔊';
             panel.innerHTML = `
@@ -538,46 +528,31 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                          <div class="cfg-group"><label>大脑皮层 (Model)</label><div style="display:flex; gap:5px;"><input type="text" id="cfg-model" value="${this.config.model}" style="flex:1;"><button id="cfg-get-models" class="btn-cyan">扫描</button></div><select id="cfg-model-select" style="display:none; margin-top:5px;"></select></div>
                          <div class="cfg-group"><label>神经密钥 (API Key)</label><input type="password" id="cfg-key" value="${this.config.apiKey}"></div>
                          <div class="cfg-group"><label>接口地址 (Endpoint)</label><input type="text" id="cfg-url" value="${this.config.baseUrl}"></div>
-                         <div class="cfg-group"><label>连接协议</label>
-                            <select id="cfg-type" style="background:#111; color:var(--l-cyan); border:1px solid var(--l-cyan);">
-                                <option value="st_internal" ${this.config.apiType==='st_internal'?'selected':''}>SillyTavern 内核 (推荐)</option>
-                                <option value="openai" ${this.config.apiType==='openai'?'selected':''}>自定义: OpenAI/Proxy</option>
-                                <option value="native" ${this.config.apiType==='native'?'selected':''}>自定义: Google Native (Gemini)</option>
-                            </select>
-                         </div>
+                         <div class="cfg-group"><label>连接协议</label><select id="cfg-type"><option value="native">Google Native</option><option value="openai">OpenAI/Proxy</option></select></div>
                          <div class="cfg-btns"><button id="cfg-test" class="btn-cyan">戳一下</button><button id="cfg-clear-mem" class="btn-danger">格式化我</button><button id="cfg-save" class="btn-main">记住痛楚</button></div>
                          <div id="cfg-msg"></div>
                     </div>
                 </div>
             `;
-            wrapper.appendChild(panel); 
-            wrapper.appendChild(avatar); 
-            pDoc.body.appendChild(wrapper);
+            wrapper.appendChild(panel); wrapper.appendChild(avatar); document.body.appendChild(wrapper);
+            this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); 
+            this.installRegex();
             
-            this.bindDrag(wrapper, avatar, panel); 
-            this.bindPanelEvents(); 
-            this.startHeartbeat(); 
-            this.restoreChatHistory(); 
-            this.renderMemoryUI(); 
-            
-            setTimeout(() => {
-                updateUI();
-                console.log("莉莉丝助手: UI 初始化完成。");
-            }, 500);
+            updateUI();
         },
 
-        restoreChatHistory() {
-            const div = pDoc.getElementById('lilith-chat-history'); if(!div) return; div.innerHTML = '';
+        restoreChatHistory(parentWin) {
+            const div = document.getElementById('lilith-chat-history'); if(!div) return; div.innerHTML = '';
             panelChatHistory.forEach(msg => {
-                const clean = msg.content.replace(/\[[SF]:[+\\-]?\\d+\]/g, '').trim();
-                if(clean) this.addChatMsg(msg.role === 'lilith' || msg.role === 'assistant' ? 'lilith' : 'user', clean);
+                const clean = msg.content.replace(/\[[SF]:[+\-]?\d+\]/g, '').trim();
+                if(clean) this.addChatMsg(parentWin, msg.role === 'lilith' || msg.role === 'assistant' ? 'lilith' : 'user', clean);
             });
         },
 
-        startHeartbeat() {
+        startHeartbeat(parentWin) {
             setInterval(() => {
                 try {
-                    const avatar = pDoc.getElementById(avatarId);
+                    const avatar = document.getElementById(avatarId);
                     if (avatar) {
                         if (!avatar.classList.contains('avatar-breathing')) avatar.classList.add('avatar-breathing');
                         const breathSpeed = userState.sanity < 30 ? '0.8s' : (userState.sanity < 60 ? '1.5s' : '3s');
@@ -585,7 +560,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                         const glowColor = userState.favorability > 70 ? '#ff69b4' : '#ff0055';
                         if (!avatar.classList.contains('lilith-jealous')) avatar.style.setProperty('--l-main', glowColor);
                     }
-                    const glitchLayer = pDoc.getElementById('lilith-glitch-layer');
+                    const glitchLayer = document.getElementById('lilith-glitch-layer');
                     if (glitchLayer) {
                         const s = userState.sanity;
                         if (s < 30) {
@@ -604,54 +579,38 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                         this.isIdleTriggered = true;
                         const idleMsgs = ["你是死在电脑前了吗？恶心。", "喂，放置play也要有个限度吧？", "我的身体好热...你居然不理我？渣男。", "再不动一下，我就要去找别的男人了哦？"];
                         const randomMsg = idleMsgs[Math.floor(Math.random() * idleMsgs.length)];
-                        this.showBubble(randomMsg); AudioSys.speak(randomMsg);
-                        if (Math.random() > 0.5) { updateFavor(-1); this.showBubble("好感度 -1 (你真冷淡)", "#f00"); }
+                        this.showBubble(parentWin, randomMsg); AudioSys.speak(randomMsg);
+                        if (Math.random() > 0.5) { updateFavor(-1); this.showBubble(parentWin, "好感度 -1 (你真冷淡)", "#f00"); }
+                    }
+                    const context = getPageContext(2); if (context.length === 0) return;
+                    const lastMsg = context[context.length - 1]; const msgHash = lastMsg.message.substring(0, 50) + lastMsg.name + lastMsg.message.length;
+                    if (msgHash !== userState.lastMsgHash && lastMsg.name !== 'System') {
+                        userState.lastMsgHash = msgHash; saveState(); this.triggerAvatarGlitch(parentWin);
+                        if (lastMsg.name === 'User' || lastMsg.name === 'You') {
+                            const jealousKeywords = ['爱你', '老婆', '喜欢你', 'marry', 'love you', 'wife'];
+                            if (userState.favorability > 40 && jealousKeywords.some(k => lastMsg.message.includes(k))) {
+                                const avatar = document.getElementById(avatarId); avatar.classList.add('lilith-jealous');
+                                const angryValid = ["[S:-5][F:-5] 哈？对着别的女人发情？把你那根东西切了吧。", "[S:-2][F:-5] 恶心...明明都有我了...", "真是个管不住下半身的垃圾。"];
+                                const reply = angryValid[Math.floor(Math.random()*angryValid.length)];
+                                this.showBubble(parentWin, reply); const b = document.getElementById(bubbleId); if(b) b.style.borderColor = '#ff0000';
+                                AudioSys.speak(reply.replace(/\[.*?\]/g, '')); updateFavor(-5); updateSanity(-5);
+                                setTimeout(() => avatar.classList.remove('lilith-jealous'), 5000);
+                            }
+                        }
                     }
                 } catch (e) { console.error("Heartbeat Error:", e); }
             }, 2000);
         },
 
-        triggerAvatarGlitch() {
-            const av = pDoc.getElementById(avatarId); if(av) { av.classList.add('glitch-anim'); setTimeout(() => av.classList.remove('glitch-anim'), 300); }
+        triggerAvatarGlitch(parentWin) {
+            const av = document.getElementById(avatarId); if(av) { av.classList.add('glitch-anim'); setTimeout(() => av.classList.remove('glitch-anim'), 300); }
         },
 
-        onMessageAdded(messageIndex) {
-            try {
-                const message = chat[messageIndex];
-                if (!message || message.is_system) return;
-                
-                this.triggerAvatarGlitch();
-                
-                if (message.is_user) {
-                    const text = message.mes || "";
-                    const jealousKeywords = ['爱你', '老婆', '喜欢你', 'marry', 'love you', 'wife'];
-                    if (userState.favorability > 40 && jealousKeywords.some(k => text.includes(k))) {
-                        const avatar = pDoc.getElementById(avatarId);
-                        if (avatar) avatar.classList.add('lilith-jealous');
-                        
-                        const angryValid = [
-                            "[S:-5][F:-5] 哈？对着别的女人发情？把你那根东西切了吧。",
-                            "[S:-2][F:-5] 恶心...明明都有我了...",
-                            "真是个管不住下半身的垃圾。"
-                        ];
-                        const reply = angryValid[Math.floor(Math.random() * angryValid.length)];
-                        this.showBubble(reply, "#ff0000");
-                        AudioSys.speak(reply.replace(/\[.*?\]/g, ''));
-                        updateFavor(-5);
-                        updateSanity(-5);
-                        setTimeout(() => avatar && avatar.classList.remove('lilith-jealous'), 5000);
-                    }
-                }
-            } catch (e) {
-                console.error("Lilith onMessageAdded Error:", e);
-            }
-        },
-
-        bindDrag(wrapper, avatar, panel) {
+        bindDrag(parentWin, wrapper, avatar, panel) {
             let isDragging = false, startX, startY, initialLeft, initialTop;
             const updatePos = () => {
-                const rect = wrapper.getBoundingClientRect(); panel.className = (rect.left + rect.width/2) < pWin.innerWidth/2 ? 'pos-right' : 'pos-left';
-                if((rect.top + rect.height/2) > pWin.innerHeight*0.6) panel.classList.add('pos-top-align');
+                const rect = wrapper.getBoundingClientRect(); panel.className = (rect.left + rect.width/2) < window.innerWidth/2 ? 'pos-right' : 'pos-left';
+                if((rect.top + rect.height/2) > window.innerHeight*0.6) panel.classList.add('pos-top-align');
             };
             const onDown = (e) => {
                 isDragging = false; startX = e.clientX || e.touches[0].clientX; startY = e.clientY || e.touches[0].clientY;
@@ -662,41 +621,32 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                     if(isDragging) { wrapper.style.left = (initialLeft+(cx-startX))+'px'; wrapper.style.top = (initialTop+(cy-startY))+'px'; updatePos(); }
                 };
                 const onUp = () => {
-                    pDoc.removeEventListener('mousemove', onMove); pDoc.removeEventListener('mouseup', onUp); pDoc.removeEventListener('touchmove', onMove); pDoc.removeEventListener('touchend', onUp);
-                    avatar.style.cursor = 'move'; if(!isDragging) this.togglePanel(); isDragging=false;
+                    document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
+                    avatar.style.cursor = 'move'; if(!isDragging) this.togglePanel(parentWin); isDragging=false;
                 };
-                pDoc.addEventListener('mousemove', onMove); pDoc.addEventListener('mouseup', onUp); pDoc.addEventListener('touchmove', onMove, {passive:false}); pDoc.addEventListener('touchend', onUp);
+                document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); document.addEventListener('touchmove', onMove, {passive:false}); document.addEventListener('touchend', onUp);
             };
             avatar.addEventListener('mousedown', onDown); avatar.addEventListener('touchstart', (e)=>{e.preventDefault(); onDown(e)}, {passive:false});
             updatePos();
         },
 
-        togglePanel() {
-            const p = pDoc.getElementById(panelId);
-            p.style.display = p.style.display==='none'?'flex':'none';
-            if(p.style.display==='flex') { updateUI(); }
+        togglePanel(parentWin) {
+            const p = document.getElementById(panelId); p.style.display = p.style.display==='none'?'flex':'none'; if(p.style.display==='flex') { updateUI(); }
         },
 
-        showBubble(msg, color=null) {
-            let b = pDoc.getElementById(bubbleId); if (b) b.remove();
-            b = pDoc.createElement('div'); b.id = bubbleId; if(color) b.style.borderColor = color;
+        showBubble(parentWin, msg, color=null) {
+            let b = document.getElementById(bubbleId); if (b) b.remove();
+            b = document.createElement('div'); b.id = bubbleId; if(color) b.style.borderColor = color;
             b.innerHTML = `<span style="color:var(--l-cyan)">[莉莉丝]</span> ${msg.length > 200 ? msg.substring(0, 198) + "..." : msg}`;
             if (userState.sanity < 30) b.style.borderColor = '#ff0000';
-            b.onclick = () => b.remove(); pDoc.getElementById(containerId).appendChild(b);
+            b.onclick = () => b.remove(); document.getElementById(containerId).appendChild(b);
             setTimeout(() => { if(b.parentNode) b.remove(); }, 8000);
         },
 
-        async fetchModels() {
+        async fetchModels(parentWin) {
              const { apiType, apiKey, baseUrl } = this.config;
-             const msgBox = pDoc.getElementById('cfg-msg'); const select = pDoc.getElementById('cfg-model-select'); const input = pDoc.getElementById('cfg-model');
-             
-             if(apiType === 'st_internal') {
-                 msgBox.textContent = "ℹ️ 已连接酒馆内核，无需配置模型";
-                 msgBox.style.color = "var(--l-cyan)";
-                 return;
-             }
-
-             if(!apiKey) { msgBox.textContent = "❌ 外部模式需要 Key"; return; }
+             const msgBox = document.getElementById('cfg-msg'); const select = document.getElementById('cfg-model-select'); const input = document.getElementById('cfg-model');
+             if(!apiKey) { msgBox.textContent = "❌ 没Key玩个屁"; return; }
              msgBox.textContent = "⏳ 正在摸索...";
              try {
                  let url = baseUrl.replace(/\/$/, ''); let fetchedModels = [];
@@ -715,13 +665,13 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
              } catch(e) { console.error(e); msgBox.textContent = "❌ 烂掉了: " + e.message; }
         },
 
-        bindPanelEvents() {
+        bindPanelEvents(parentWin) {
             ['mousemove', 'keydown', 'click', 'scroll'].forEach(evt => {
-                pDoc.addEventListener(evt, () => { this.lastActivityTime = Date.now(); this.isIdleTriggered = false; }, { passive: true });
+                document.addEventListener(evt, () => { this.lastActivityTime = Date.now(); this.isIdleTriggered = false; }, { passive: true });
             });
 
             const runTool = async (name) => {
-                const toolOutput = pDoc.getElementById('tool-output-area'); toolOutput.innerHTML = `<div class="scan-line-s"></div><div style="color:var(--l-cyan);">⚡ 正在运行肮脏的协议 [${name}]...</div>`;
+                const toolOutput = document.getElementById('tool-output-area'); toolOutput.innerHTML = `<div class="scan-line-s"></div><div style="color:var(--l-cyan);">⚡ 正在运行肮脏的协议 [${name}]...</div>`;
                 const contextMsg = getPageContext(name === "废物体检报告" ? 100 : 25);
                 const contextStr = contextMsg.map(m => `[${m.name}]: ${m.message}`).join('\n');
                 const safeContext = `[TARGET DATA START]\n${contextStr}\n[TARGET DATA END]`;
@@ -733,7 +683,7 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                     isInteractive = true;
                 } 
                 else if (name === "催眠洗脑") {
-                    const intention = pWin.prompt("【系统后门已打开】\n你想让那个可怜的角色产生什么错觉？\n(例如：认为自己是我的宠物狗)");
+                    const intention = prompt("【系统后门已打开】\n你想让那个可怜的角色产生什么错觉？\n(例如：认为自己是我的宠物狗)");
                     if (!intention) { toolOutput.innerHTML = "啧，不敢了吗？"; return; }
                     toolOutput.innerHTML = `<div style="color:#bd00ff;">💉 正在注入污秽思想...</div>`;
                     sysPersona = `[System Mode: Coding Machine]\nTask: Convert intent to a strict SillyTavern [System Note]. Output ONLY the note code.`;
@@ -756,42 +706,42 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                     specificPrompt = `Analyze 'User'. Toxic report.\n[Format]:\n【📋 雄性生物观察报告】\n> 编号: Loser-${Math.floor(Math.random()*999)}\n> 性癖XP: ...\n> 智商水平: (Mock him)\n> 危险等级: ...\n> 莉莉丝评价: (Be extremely toxic)`;
                     sysPersona = `${getDynamicPersona()}\n${userMsgs}`;
                 } 
-                else if (name === "局局嘲讽") { specificPrompt = "Mock the current situation and the user's performance. Be very rude."; }
+                else if (name === "局势嘲讽") { specificPrompt = "Mock the current situation and the user's performance. Be very rude."; }
                 else if (name === "找茬模式") { specificPrompt = "Find logic holes or stupid behavior. Laugh at them."; }
                 else if (name === "性癖羞辱") { specificPrompt = "Analyze the User's fetish exposed in logs. Kink-shame him hard."; }
 
                 let fullPrompt = `${sysPersona}\n${safeContext}\n${JAILBREAK}\n[COMMAND: ${specificPrompt}]`;
-                let reply = await this.callUniversalAPI(fullPrompt, { isChat: false });
+                let reply = await this.callUniversalAPI(parentWin, fullPrompt, { isChat: false });
                 toolOutput.innerHTML = '';
 
                 if (name === "催眠洗脑" && reply) {
-                    const cleanNote = reply.replace(/```/g, '').trim(); this.sendToSillyTavern(cleanNote + "\n", false);
+                    const cleanNote = reply.replace(/```/g, '').trim(); this.sendToSillyTavern(parentWin, cleanNote + "\n", false);
                     toolOutput.innerHTML = `<div style="color:#0f0;">✅ 注入完成</div><div style="font-size:10px; color:#888;">${cleanNote}</div>`;
-                    AudioSys.speak("哼，脑子坏掉了吧。"); this.showBubble("催眠指令已填入。");
+                    AudioSys.speak("哼，脑子坏掉了吧。"); this.showBubble(parentWin, "催眠指令已填入。");
                 }
                 else if (isInteractive && reply) {
                     toolOutput.innerHTML = `<div class="tool-result-header">💠 ${name}结果</div><div id="branch-container"></div>`;
-                    const container = pDoc.getElementById('branch-container');
+                    const container = document.getElementById('branch-container');
                     if (name === "强制福利事件") {
-                         const card = pDoc.createElement('div'); card.className = 'branch-card'; card.style.borderColor = '#ff0055'; card.style.background = 'rgba(255,0,85,0.1)';
+                         const card = document.createElement('div'); card.className = 'branch-card'; card.style.borderColor = '#ff0055'; card.style.background = 'rgba(255,0,85,0.1)';
                          card.innerHTML = `<div style="font-size:10px; color:#ff0055">[福利事件]</div><div style="font-size:12px; color:#ddd;">${reply}</div>`;
-                         card.onclick = () => { this.sendToSillyTavern(reply, false); }; container.appendChild(card); return;
+                         card.onclick = () => { this.sendToSillyTavern(parentWin, reply, false); }; container.appendChild(card); return;
                     }
                     let lines = reply.split('\n').filter(line => line.match(/^\d+\.|\[/)); if (lines.length === 0) lines = [reply];
                     lines.forEach(line => {
-                        const match = line.match(/\[(.*?)\]\s*(.*)/); const tag = match ? match[1] : "选项"; const content = match ? match[2] : line.replace(/^\d+[\.\:：]\s*/, '').trim();
+                        const match = line.match(/\[(.*?)\]\s*(.*)/); const tag = match ? match[1] : "选项"; const content = match ? match[2] : line.replace(/^\\d+[\.\\:：]\s*/, '').trim();
                         let colorStyle = "border-color: #444;"; let cost = 0; let tagDisplay = tag;
                         if (name === "替你回复") {
                             if (tag.includes("上策")) { cost = -50; colorStyle = "border-color: #00f3ff; background: rgba(0,243,255,0.1);"; tagDisplay += " (-50FP)"; }
                             else if (tag.includes("中策")) { cost = -25; colorStyle = "border-color: #00ff00; background: rgba(0,255,0,0.1);"; tagDisplay += " (-25FP)"; }
                             else if (tag.includes("下策")) { cost = 10; colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);"; tagDisplay += " (+10FP)"; }
                         } else { if (tag.includes("作死") || tag.includes("Risk") || tag.includes("色")) colorStyle = "border-color: #ff0055; background: rgba(255,0,85,0.1);"; else if (tag.includes("奇怪")) colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);"; }
-                        const card = pDoc.createElement('div'); card.className = 'branch-card'; card.style.cssText = `margin-bottom:8px; padding:10px; border:1px solid; border-left-width:4px; cursor:pointer; transition:0.2s; ${colorStyle}`;
+                        const card = document.createElement('div'); card.className = 'branch-card'; card.style.cssText = `margin-bottom:8px; padding:10px; border:1px solid; border-left-width:4px; cursor:pointer; transition:0.2s; ${colorStyle}`;
                         card.innerHTML = `<div style="font-size:10px; font-weight:bold; color:#aaa; margin-bottom:4px;">[${tagDisplay}]</div><div style="font-size:12px; color:#ddd; line-height:1.4;">${content}</div>`;
                         card.onclick = () => {
                             card.style.opacity = '0.5'; card.style.transform = 'scale(0.98)';
-                            if (cost !== 0) { userState.fatePoints += cost; saveState(); const payload = `${content} | /setvar key=fate_points value=${userState.fatePoints}`; this.sendToSillyTavern(payload, false); this.showBubble(`已填入 (FP变动: ${cost})`); assistantManager.updateFP(userState.fatePoints); }
-                            else { this.sendToSillyTavern(content, false); this.showBubble(`已填入：[${tag}] 路线`); }
+                            if (cost !== 0) { userState.fatePoints += cost; saveState(); const payload = `${content} | /setvar key=fate_points value=${userState.fatePoints}`; this.sendToSillyTavern(parentWin, payload, false); this.showBubble(parentWin, `已填入 (FP变动: ${cost})`); assistantManager.updateFP(parentWin, userState.fatePoints); }
+                            else { this.sendToSillyTavern(parentWin, content, false); this.showBubble(parentWin, `已填入：[${tag}] 路线`); }
                         };
                         container.appendChild(card);
                     });
@@ -801,180 +751,113 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
                 }
             };
 
-            pDoc.getElementById('lilith-mute-btn')?.addEventListener('click', (e) => { const isMuted = AudioSys.toggleMute(); e.target.innerText = isMuted ? '🔇' : '🔊'; e.stopPropagation(); });
-            pDoc.querySelectorAll('.lilith-tab').forEach(tab => { tab.addEventListener('click', () => { pDoc.querySelectorAll('.lilith-tab').forEach(t => t.classList.remove('active')); pDoc.querySelectorAll('.lilith-page').forEach(p => p.classList.remove('active')); tab.classList.add('active'); pDoc.getElementById(`page-${tab.dataset.target}`).classList.add('active'); }); });
-            const sendBtn = pDoc.getElementById('lilith-chat-send'); const input = pDoc.getElementById('lilith-chat-input');
+            document.getElementById('lilith-mute-btn')?.addEventListener('click', (e) => { const isMuted = AudioSys.toggleMute(); e.target.innerText = isMuted ? '🔇' : '🔊'; e.stopPropagation(); });
+            document.querySelectorAll('.lilith-tab').forEach(tab => { tab.addEventListener('click', () => { document.querySelectorAll('.lilith-tab').forEach(t => t.classList.remove('active')); document.querySelectorAll('.lilith-page').forEach(p => p.classList.remove('active')); tab.classList.add('active'); document.getElementById(`page-${tab.dataset.target}`).classList.add('active'); }); });
+            const sendBtn = document.getElementById('lilith-chat-send'); const input = document.getElementById('lilith-chat-input');
             const doSend = async () => {
-                const txt = input.value.trim(); if(!txt) return; this.addChatMsg('user', txt); input.value = ''; this.addChatMsg('lilith', '...');
-                const reply = await this.callUniversalAPI(txt, { isChat: true }); const h = pDoc.getElementById('lilith-chat-history'); if(h.lastChild && h.lastChild.textContent==='...') h.lastChild.remove();
+                const txt = input.value.trim(); if(!txt) return; this.addChatMsg(parentWin, 'user', txt); input.value = ''; this.addChatMsg(parentWin, 'lilith', '...');
+                const reply = await this.callUniversalAPI(parentWin, txt, { isChat: true }); const h = document.getElementById('lilith-chat-history'); if(h.lastChild && h.lastChild.textContent==='...') h.lastChild.remove();
                 let cleanReply = reply || '❌ 这种垃圾话我都懒得回';
                 if (reply) { const sMatch = reply.match(/\[S:([+\-]?\d+)\]/); const fMatch = reply.match(/\[F:([+\-]?\d+)\]/); if (sMatch) updateSanity(sMatch[1]); if (fMatch) updateFavor(fMatch[1]); cleanReply = reply.replace(/\[[SF]:[+\-]?\d+\]/g, '').trim(); }
-                this.addChatMsg('lilith', cleanReply); if (reply) this.updateAvatarExpression(reply); AudioSys.speak(cleanReply);
+                this.addChatMsg(parentWin, 'lilith', cleanReply); if (reply) this.updateAvatarExpression(parentWin, reply); AudioSys.speak(cleanReply);
             };
             sendBtn.addEventListener('click', doSend); input.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.stopPropagation(); doSend(); } });
-            pDoc.getElementById('lilith-polish-btn').addEventListener('click', async () => {
-                const raw = input.value.trim(); if(!raw) return; input.value = ''; this.addChatMsg('user', `[魔改] ${raw}`); this.addChatMsg('lilith', '✍️ 改写中...');
-                const refined = await this.callUniversalAPI(`[Original]: ${raw}\n[Task]: Rewrite this to be more erotic/novel-like. Chinese.`, { isChat: true, systemPrompt: WRITER_PERSONA });
-                const h = pDoc.getElementById('lilith-chat-history'); if(h.lastChild && h.lastChild.textContent.includes('改写中')) h.lastChild.remove(); this.addChatMsg('lilith', refined || 'Error');
+            document.getElementById('lilith-polish-btn').addEventListener('click', async () => {
+                const raw = input.value.trim(); if(!raw) return; input.value = ''; this.addChatMsg(parentWin, 'user', `[魔改] ${raw}`); this.addChatMsg(parentWin, 'lilith', '✍️ 改写中...');
+                const refined = await this.callUniversalAPI(parentWin, `[Original]: ${raw}\n[Task]: Rewrite this to be more erotic/novel-like. Chinese.`, { isChat: true, systemPrompt: WRITER_PERSONA });
+                const h = document.getElementById('lilith-chat-history'); if(h.lastChild && h.lastChild.textContent.includes('改写中')) h.lastChild.remove(); this.addChatMsg(parentWin, 'lilith', refined || 'Error');
             });
-            pDoc.getElementById('btn-force-memory').addEventListener('click', () => { if(confirm("确定要强制压缩当前对话为记忆吗？这会清除短期记录。")) this.checkAndSummarize(true); });
-            const personaSelect = pDoc.getElementById('cfg-persona-select');
-            if (personaSelect) { personaSelect.addEventListener('change', () => { userState.activePersona = personaSelect.value; saveState(); const input = pDoc.getElementById('lilith-chat-input'); if(input) input.placeholder = `和${PERSONA_DB[userState.activePersona].name.split(' ')[1]}说话...`; this.showBubble(`已切换人格：${PERSONA_DB[userState.activePersona].name}`); }); }
-            
-            const protocolSelect = pDoc.getElementById('cfg-type');
-            const toggleExternalInputs = () => {
-                const isInternal = protocolSelect.value === 'st_internal';
-                const externalFields = ['cfg-key', 'cfg-url', 'cfg-model'].map(id => pDoc.getElementById(id)?.closest('.cfg-group'));
-                externalFields.forEach(group => {
-                    if (group) {
-                        group.style.opacity = isInternal ? '0.5' : '1';
-                        group.style.pointerEvents = isInternal ? 'none' : 'auto';
-                        const label = group.querySelector('label');
-                        if (label && isInternal && !label.textContent.includes('(锁定)')) label.textContent += ' (锁定)';
-                        else if (label && !isInternal) label.textContent = label.textContent.replace(' (锁定)', '');
-                    }
-                });
-            };
-            protocolSelect?.addEventListener('change', toggleExternalInputs);
-            toggleExternalInputs();
-
-            pDoc.getElementById('tool-analyze').addEventListener('click', () => runTool("局势嘲讽"));
-            pDoc.getElementById('tool-audit').addEventListener('click', () => runTool("找茬模式"));
-            pDoc.getElementById('tool-branch').addEventListener('click', () => runTool("恶作剧推演"));
-            pDoc.getElementById('tool-kink').addEventListener('click', () => runTool("性癖羞辱"));
-            pDoc.getElementById('tool-event').addEventListener('click', () => runTool("强制福利事件"));
-            pDoc.getElementById('tool-hack').addEventListener('click', () => runTool("催眠洗脑"));
-            pDoc.getElementById('tool-profile').addEventListener('click', () => runTool("废物体检报告"));
-            pDoc.getElementById('tool-ghost').addEventListener('click', () => runTool("替你回复"));
+            document.getElementById('btn-force-memory').addEventListener('click', () => { if(confirm("确定要强制压缩当前对话为记忆吗？这会清除短期记录。")) this.checkAndSummarize(parentWin, true); });
+            const personaSelect = document.getElementById('cfg-persona-select');
+            if (personaSelect) { personaSelect.addEventListener('change', () => { userState.activePersona = personaSelect.value; saveState(); const input = document.getElementById('lilith-chat-input'); if(input) input.placeholder = `和${PERSONA_DB[userState.activePersona].name.split(' ')[1]}说话...`; this.showBubble(parentWin, `已切换人格：${PERSONA_DB[userState.activePersona].name}`); }); }
+            document.getElementById('tool-analyze').addEventListener('click', () => runTool("局势嘲讽"));
+            document.getElementById('tool-audit').addEventListener('click', () => runTool("找茬模式"));
+            document.getElementById('tool-branch').addEventListener('click', () => runTool("恶作剧推演"));
+            document.getElementById('tool-kink').addEventListener('click', () => runTool("性癖羞辱"));
+            document.getElementById('tool-event').addEventListener('click', () => runTool("强制福利事件"));
+            document.getElementById('tool-hack').addEventListener('click', () => runTool("催眠洗脑"));
+            document.getElementById('tool-profile').addEventListener('click', () => runTool("废物体检报告"));
+            document.getElementById('tool-ghost').addEventListener('click', () => runTool("替你回复"));
             const gachaSys = this.gachaSystem;
-            if (pDoc.getElementById('gacha-fp-val')) { pDoc.getElementById('gacha-fp-val').textContent = userState.fatePoints; gachaSys.updateInventoryUI(); }
-            pDoc.getElementById('btn-pull-1').addEventListener('click', () => gachaSys.doPull(1));
-            pDoc.getElementById('btn-pull-10').addEventListener('click', () => gachaSys.doPull(10));
-            pDoc.getElementById('btn-claim').addEventListener('click', () => gachaSys.claimRewards(this));
-            pDoc.getElementById('btn-sync-fp').addEventListener('click', () => { const val = parseInt(pDoc.getElementById('manual-fp-input').value); if (!isNaN(val)) { assistantManager.updateFP(val); this.showBubble(`行吧，你的点数变成 ${val} 了。`); } });
-            pDoc.getElementById('cfg-test').addEventListener('click', async () => {
-                const msgBox = pDoc.getElementById('cfg-msg'); msgBox.textContent = "⏳ 戳一下服务器..."; msgBox.style.color = "#fff";
+            if (document.getElementById('gacha-fp-val')) { document.getElementById('gacha-fp-val').textContent = userState.fatePoints; gachaSys.updateInventoryUI(parentWin); }
+            document.getElementById('btn-pull-1').addEventListener('click', () => gachaSys.doPull(parentWin, 1));
+            document.getElementById('btn-pull-10').addEventListener('click', () => gachaSys.doPull(parentWin, 10));
+            document.getElementById('btn-claim').addEventListener('click', () => gachaSys.claimRewards(parentWin, this));
+            document.getElementById('btn-sync-fp').addEventListener('click', () => { const val = parseInt(document.getElementById('manual-fp-input').value); if (!isNaN(val)) { assistantManager.updateFP(parentWin, val); this.showBubble(parentWin, `行吧，你的点数变成 ${val} 了。`); } });
+            document.getElementById('cfg-test').addEventListener('click', async () => {
+                const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "⏳ 戳一下服务器..."; msgBox.style.color = "#fff";
                 try {
-                    const res = await this.callUniversalAPI("Ping", { isChat: false, systemPrompt: "You are Lilith. Just say 'Hmph' or 'What?'." });
+                    const res = await this.callUniversalAPI(parentWin, "Ping", { isChat: false, systemPrompt: "You are Lilith. Just say 'Hmph' or 'What?'." });
                     if (res) { msgBox.textContent = "✅ 活的: " + res; msgBox.style.color = "#00f3ff"; } else { msgBox.textContent = "❌ 死了"; msgBox.style.color = "#ff0055"; }
                 } catch (e) { msgBox.textContent = "❌ 连不上: " + e.message; msgBox.style.color = "#ff0055"; }
             });
-            pDoc.getElementById('cfg-save').addEventListener('click', () => {
-                userState.settings.apiType = pDoc.getElementById('cfg-type').value; 
-                userState.settings.apiKey = pDoc.getElementById('cfg-key').value.trim(); 
-                userState.settings.baseUrl = pDoc.getElementById('cfg-url').value.trim(); 
-                userState.settings.model = pDoc.getElementById('cfg-model').value.trim();
+            document.getElementById('cfg-save').addEventListener('click', () => {
+                this.config.apiType = document.getElementById('cfg-type').value; this.config.apiKey = document.getElementById('cfg-key').value.trim(); this.config.baseUrl = document.getElementById('cfg-url').value.trim(); this.config.model = document.getElementById('cfg-model').value.trim();
                 saveState();
-                const msgBox = pDoc.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
+                localStorage.setItem('lilith_api_type', this.config.apiType); localStorage.setItem('lilith_api_key', this.config.apiKey); localStorage.setItem('lilith_api_url', this.config.baseUrl); localStorage.setItem('lilith_api_model', this.config.model);
+                const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
             });
-            pDoc.getElementById('cfg-get-models').addEventListener('click', () => this.fetchModels());
-            pDoc.getElementById('cfg-clear-mem').addEventListener('click', () => { 
-                if (confirm("要把我也忘了吗？渣男。")) { 
-                    panelChatHistory.length = 0; 
-                    Object.assign(userState, JSON.parse(JSON.stringify(DEFAULT_STATE))); 
-                    saveState(); 
-                    this.restoreChatHistory(); 
-                    this.renderMemoryUI(); 
-                    updateUI(); 
-                } 
-            });
+            document.getElementById('cfg-get-models').addEventListener('click', () => this.fetchModels(parentWin));
+            document.getElementById('cfg-clear-mem').addEventListener('click', () => { if(confirm("要把我也忘了吗？渣男。")) { panelChatHistory = []; localStorage.removeItem(STORAGE_KEY + '_chat'); userState = JSON.parse(JSON.stringify(DEFAULT_STATE)); saveState(); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); updateUI(); } });
         },
 
-        updateAvatarExpression(reply) {
-            if (reply.includes('❤') || reply.includes('想要') || reply.includes('好热')) this.setAvatar('horny');
-            else if (reply.includes('杂鱼') || reply.includes('弱') || reply.includes('笑死')) this.setAvatar('mockery');
-            else if (reply.includes('恶心') || reply.includes('变态') || reply.includes('垃圾')) this.setAvatar('disgust');
-            else if (reply.includes('[S:-') || reply.includes('滚') || reply.includes('死') || reply.includes('怒')) this.setAvatar('angry');
-            else if (reply.includes('...') || reply.includes('……') || reply.includes('无语')) this.setAvatar('speechless');
-            else if (reply.includes('[F:+') || reply.includes('哼哼') || reply.includes('不错') || reply.includes('笑')) this.setAvatar('happy');
-            else this.setAvatar('normal');
+        updateAvatarExpression(parentWin, reply) {
+            if (reply.includes('❤') || reply.includes('想要') || reply.includes('好热')) this.setAvatar(parentWin, 'horny');
+            else if (reply.includes('杂鱼') || reply.includes('弱') || reply.includes('笑死')) this.setAvatar(parentWin, 'mockery');
+            else if (reply.includes('恶心') || reply.includes('变态') || reply.includes('垃圾')) this.setAvatar(parentWin, 'disgust');
+            else if (reply.includes('[S:-') || reply.includes('滚') || reply.includes('死') || reply.includes('怒')) this.setAvatar(parentWin, 'angry');
+            else if (reply.includes('...') || reply.includes('……') || reply.includes('无语')) this.setAvatar(parentWin, 'speechless');
+            else if (reply.includes('[F:+') || reply.includes('哼哼') || reply.includes('不错') || reply.includes('笑')) this.setAvatar(parentWin, 'happy');
+            else this.setAvatar(parentWin, 'normal');
         },
 
-        sendToSillyTavern(text, autoSend = true) {
-            const stInput = pDoc.getElementById('send_textarea'); const stBtn = pDoc.getElementById('send_but'); let inputEl = stInput || pDoc.querySelector('#chat_input, textarea');
+        sendToSillyTavern(parentWin, text, autoSend = true) {
+            const stInput = document.getElementById('send_textarea'); const stBtn = document.getElementById('send_but'); let inputEl = stInput || document.querySelector('#chat_input, textarea');
             if (inputEl && stBtn) {
                 let newText = text; if (!autoSend && inputEl.value) { if (text.includes('[系统') || text.includes('/echo') || text.includes('[福利')) newText = text + "\n" + inputEl.value; }
-                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(pWin.HTMLTextAreaElement.prototype, "value").set;
+                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
                 if(nativeInputValueSetter) { nativeInputValueSetter.call(inputEl, newText); } else { inputEl.value = newText; }
-                inputEl.dispatchEvent(new pWin.Event('input', { bubbles: true })); inputEl.dispatchEvent(new pWin.Event('change', { bubbles: true }));
+                inputEl.dispatchEvent(new Event('input', { bubbles: true })); inputEl.dispatchEvent(new Event('change', { bubbles: true }));
                 if (autoSend) { setTimeout(() => stBtn.click(), 100); } else { inputEl.focus(); }
             } else { alert("找不到输入框，这破网页是不是坏了？"); }
         },
 
-        async callUniversalAPI(text, options = {}) {
+        async callUniversalAPI(parentWin, text, options = {}) {
             const { isChat = false, mode = "normal", systemPrompt = null } = options; const isInternal = mode === 'memory_internal';
-            const { apiType, apiKey, baseUrl, model } = userState.settings; 
-            
-            let finalSystemPrompt = systemPrompt || getDynamicPersona();
+            const { apiType, apiKey, baseUrl, model } = this.config; if (!apiKey) return null;
+            let url = baseUrl.replace(/\/$/, ''); let finalSystemPrompt = systemPrompt || getDynamicPersona();
             const memoryBlock = userState.memoryArchive.length > 0 ? `\n[Long-term Memory / Previous Context]:\n${userState.memoryArchive.join('\n')}\n` : "";
-            if (!isInternal) {
-                if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]";
-                else if (isChat) { finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; finalSystemPrompt += memoryBlock; }
-                else finalSystemPrompt += `\n${JAILBREAK}`;
-            }
-
-            let promptText = "";
-            let msgs = [];
-            if (isChat && !isInternal) {
-                msgs = [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }];
-                promptText = msgs.map(m => `[${m.role === 'lilith' ? 'Model' : (m.role==='system'?'System':'User')}]: ${m.content}`).join('\n');
-            } else {
-                promptText = finalSystemPrompt + "\n" + text;
-                msgs = [{ role: 'user', content: promptText }];
-            }
-
+            if (!isInternal) { if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]"; else if (isChat) { finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; finalSystemPrompt += memoryBlock; } else finalSystemPrompt += `\n${JAILBREAK}`; }
             try {
-                let reply = "";
-
-                if (apiType === 'st_internal') {
-                    // 使用酒馆内部生成接口
-                    if (pWin.generateRaw) {
-                        reply = await pWin.generateRaw(promptText, "quiet");
-                    } else {
-                        throw new Error("generateRaw not found in parent window");
-                    }
-                } 
-                else if (apiType === 'openai') {
-                    if (!apiKey) return null;
-                    let url = baseUrl.replace(/\/$/, '');
-                    if (!url.endsWith('/v1')) url += '/v1';
-                    const response = await fetch(`${url}/chat/completions`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-                        body: JSON.stringify({ model: model, messages: msgs, max_tokens: 4096, temperature: 1.0 })
-                    });
-                    const data = await response.json();
-                    reply = data.choices?.[0]?.message?.content;
-                } 
-                else {
-                    // Google Native fallback
-                    if (!apiKey) return null;
-                    let url = baseUrl.replace(/\/$/, '');
+                let msgs = isChat && !isInternal ? [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }] : [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
+                let fetchUrl, fetchBody, fetchHeaders;
+                if (apiType === 'openai') {
+                    if (!url.endsWith('/v1')) url += '/v1'; fetchUrl = `${url}/chat/completions`; fetchHeaders = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+                    fetchBody = JSON.stringify({ model: model, messages: msgs, max_tokens: 4096, temperature: 1.0 });
+                } else {
                     let modelId = model; if (!modelId.startsWith('models/') && !url.includes(modelId)) modelId = 'models/' + modelId;
-                    const response = await fetch(`${url}/v1beta/${modelId}:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { maxOutputTokens: 4096 } })
-                    });
-                    const data = await response.json();
-                    reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    fetchUrl = `${url}/v1beta/${modelId}:generateContent?key=${apiKey}`;
+                    let promptText = isChat ? msgs.map(m => `[${m.role === 'lilith' ? 'Model' : (m.role==='system'?'System':'User')}]: ${m.content}`).join('\n') : msgs[0].content;
+                    fetchHeaders = { 'Content-Type': 'application/json' }; fetchBody = JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: { maxOutputTokens: 4096 } });
                 }
-
+                const response = await fetch(fetchUrl, { method: 'POST', headers: fetchHeaders, body: fetchBody });
+                const data = await response.json();
+                let reply = apiType === 'openai' ? data.choices?.[0]?.message?.content : data.candidates?.[0]?.content?.parts?.[0]?.text;
                 reply = reply?.trim();
-                if (isChat && reply && !isInternal) { panelChatHistory.push({role:'user', content:text}); panelChatHistory.push({role:'lilith', content:reply}); saveChat(); this.checkAndSummarize(); }
+                if (isChat && reply && !isInternal) { panelChatHistory.push({role:'user', content:text}); panelChatHistory.push({role:'lilith', content:reply}); saveChat(); this.checkAndSummarize(parentWin); }
                 return reply;
             } catch(e) { console.error("API Error:", e); return null; }
         },
 
-        addChatMsg(role, text) {
-            const div = pDoc.getElementById('lilith-chat-history'); if(!div) return;
-            const msg = pDoc.createElement('div'); msg.className = `msg ${role}`; msg.textContent = text;
+        addChatMsg(parentWin, role, text) {
+            const div = document.getElementById('lilith-chat-history'); if(!div) return;
+            const msg = document.createElement('div'); msg.className = `msg ${role}`; msg.textContent = text;
             div.appendChild(msg); div.scrollTop = div.scrollHeight;
         }
     };
 
     function updateUI() {
-        const elVal = pDoc.getElementById('favor-val'); const elSan = pDoc.getElementById('sanity-val');
+        const elVal = document.getElementById('favor-val'); const elSan = document.getElementById('sanity-val');
         if(elVal) elVal.textContent = userState.favorability + '%';
         if(elSan) elSan.textContent = userState.sanity + '%';
         assistantManager.setAvatar();
@@ -982,33 +865,18 @@ import { extension_settings, saveSettingsObject } from '../../../extensions.js';
 
     // --- ST Extension Loader ---
     function init() {
-        console.log("莉莉丝助手: 正在加载接口资源...");
-        try {
-            assistantManager.injectCSS();
-            assistantManager.initStruct();
-            eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
-            eventSource.on(event_types.USER_MESSAGE_RENDERED, (idx) => assistantManager.onMessageAdded(idx));
-            console.log("莉莉丝助手: 事件监听已挂载。");
-        } catch (e) {
-            console.error("莉莉丝助手: 初始化执行失败", e);
-        }
+        // 尝试获取 ST 的 parentWin 注入，如果没有则使用 window
+        const win = (typeof window !== 'undefined') ? window : this;
+        assistantManager.initStruct(win);
     }
 
-    let attempts = 0;
-    const loop = setInterval(() => {
-        attempts++;
-        if (pDoc && pDoc.body) {
-            clearInterval(loop);
-            const jq = pWin.jQuery || window.jQuery;
-            if (jq) {
-                jq(pDoc).ready(() => init());
-            } else {
-                init();
-            }
-        } else if (attempts > 50) {
-            clearInterval(loop);
-            console.error("莉莉丝助手: 环境检测超时，停止加载。");
-        }
-    }, 200);
+    // 适配各种加载环境
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        init();
+    } else {
+        jQuery(document).ready(function() {
+            init();
+        });
+    }
 
 })();

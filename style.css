@@ -21,13 +21,28 @@
     height: 100px;
     background-size: cover;
     background-position: center;
-    background-color: #222; /* Fallback color */
+    background-color: #111; /* 增强：增加背景色，防止图片加载失败时完全透明 */
     border-radius: 50%;
     cursor: move;
     pointer-events: auto;
     filter: drop-shadow(0 0 10px var(--l-main));
-    transition: transform 0.2s, filter 0.3s, background-image 0.5s ease-in-out;
+    transition: transform 0.2s, filter 0.3s;
     border: 2px solid var(--l-main);
+    box-shadow: inset 0 0 15px rgba(255, 0, 85, 0.3); /* 增加内阴影 */
+}
+
+/* 屏幕故障层 */
+.screen-glitch-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    background: transparent;
 }
 
 #lilith-avatar-cn:hover {
