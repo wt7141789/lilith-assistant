@@ -1,0 +1,11 @@
+{
+    "display_name": "莉莉丝助手 (Lilith Assistant)",
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Izumi Konata & AI Assistant",
+    "version": "1.0.0",
+    "description": "简短回复版本莉莉丝助手，包含多重人格、抽卡系统、记忆系统及动态立绘。",
+    "loading_order": 10,
+    "auto_update": false,
+    "minimum_client_version": "1.11.0"
+}
