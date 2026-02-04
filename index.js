@@ -223,7 +223,9 @@
         gachaInventory: [], 
         currentFace: 'normal',
         memoryArchive: [],
-        activePersona: 'toxic'
+        activePersona: 'toxic',
+        hideAvatar: false,
+        avatarSize: 150
     };
     
     let userState = getExtensionSettings().userState;
@@ -235,6 +237,8 @@
     if (userState.gachaInventory === undefined) userState.gachaInventory = [];
     if (userState.memoryArchive === undefined) userState.memoryArchive = [];
     if (userState.activePersona === undefined) userState.activePersona = 'toxic';
+    if (userState.hideAvatar === undefined) userState.hideAvatar = false;
+    if (userState.avatarSize === undefined) userState.avatarSize = 150;
 
     let panelChatHistory = getExtensionSettings().chatHistory || [];
 
@@ -311,6 +315,35 @@
                 else targetUrl = this.avatarImages.normal;
             }
             av.style.backgroundImage = `url('${targetUrl}')`;
+            this.updateAvatarStyle(parentWin);
+        },
+
+        updateAvatarStyle(parentWin) {
+            const av = document.getElementById(avatarId);
+            if (!av) return;
+            av.style.display = userState.hideAvatar ? 'none' : 'block';
+            av.style.width = userState.avatarSize + 'px';
+            av.style.height = userState.avatarSize + 'px';
+        },
+
+        createDrawerButton(parentWin) {
+            // 尝试插入到左侧抽屉栏 (Left Drawer or Extension Menu)
+            // SillyTavern common left drawer ID is usually #left-drawer or #extensions_settings depending on intent.
+            // But usually we append to the top bar or inside the drawer list.
+            
+            const drawerList = document.querySelector('#left-drawer');
+            if (drawerList && !document.getElementById('lilith-drawer-btn')) {
+                const btn = document.createElement('div');
+                btn.id = 'lilith-drawer-btn';
+                // Try to mimic ST drawer item style if possible, or generic
+                btn.className = 'drawer-content-item'; 
+                btn.style.cssText = 'padding:10px; cursor:pointer; color:var(--l-main); border-bottom:1px solid #444; font-weight:bold; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,0.2);';
+                btn.innerHTML = '<span style="font-size:16px;">😈</span><span>莉莉丝助手</span>';
+                btn.onclick = () => this.togglePanel(parentWin);
+                
+                // Prepend to make it visible at top
+                drawerList.prepend(btn);
+            }
         },
 
         lastActivityTime: Date.now(),
@@ -538,13 +571,30 @@
                          <div class="cfg-group"><label>神经密钥 (API Key)</label><input type="password" id="cfg-key" value="${this.config.apiKey}"></div>
                          <div class="cfg-group"><label>接口地址 (Endpoint)</label><input type="text" id="cfg-url" value="${this.config.baseUrl}"></div>
                          <div class="cfg-group"><label>连接协议</label><select id="cfg-type"><option value="native">Google Native</option><option value="openai">OpenAI/Proxy</option></select></div>
+                         
+                         <div class="cfg-group" style="border-top:1px dashed #444; margin-top:10px; padding-top:10px;">
+                            <label style="color:var(--l-cyan); font-weight:bold; margin-bottom:5px;">外观设定</label>
+                            <div style="display:flex; align-items:center; margin-bottom:5px;">
+                                <input type="checkbox" id="cfg-hide-avatar" ${userState.hideAvatar ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
+                                <span style="font-size:12px; color:#ccc;">隐藏悬浮球 (仅保留面板)</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <span style="font-size:12px; color:#ccc; white-space:nowrap;">球体大小: <span id="cfg-size-val">${userState.avatarSize}</span>px</span>
+                                <input type="range" id="cfg-avatar-size" min="50" max="300" step="10" value="${userState.avatarSize}" style="flex:1; accent-color:var(--l-main);" oninput="document.getElementById('cfg-size-val').textContent = this.value">
+                            </div>
+                         </div>
+
                          <div class="cfg-btns"><button id="cfg-test" class="btn-cyan">戳一下</button><button id="cfg-clear-mem" class="btn-danger">格式化我</button><button id="cfg-save" class="btn-main">记住痛楚</button></div>
                          <div id="cfg-msg"></div>
                     </div>
                 </div>
             `;
             wrapper.appendChild(panel); wrapper.appendChild(avatar); document.body.appendChild(wrapper);
-            this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); 
+            this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin);
+            
+            this.setAvatar(parentWin);
+            this.updateAvatarStyle(parentWin);
+            this.createDrawerButton(parentWin); 
             
             updateUI();
         },
@@ -801,10 +851,18 @@
             });
             document.getElementById('cfg-save').addEventListener('click', () => {
                 this.config.apiType = document.getElementById('cfg-type').value; this.config.apiKey = document.getElementById('cfg-key').value.trim(); this.config.baseUrl = document.getElementById('cfg-url').value.trim(); this.config.model = document.getElementById('cfg-model').value.trim();
+                
+                // Save Appearance Settings
+                userState.hideAvatar = document.getElementById('cfg-hide-avatar').checked;
+                userState.avatarSize = parseInt(document.getElementById('cfg-avatar-size').value);
+                
                 saveState();
                 
                 getExtensionSettings().apiConfig = this.config;
+                getExtensionSettings().userState = userState;
                 saveExtensionSettings();
+
+                this.updateAvatarStyle(parentWin);
 
                 const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
             });
