@@ -6,9 +6,58 @@
     const avatarId = 'lilith-avatar-cn';
     const panelId = 'lilith-panel-cn';
     const bubbleId = 'lilith-bubble-cn';
-    const STORAGE_KEY = 'lilith_data_v23_fix'; 
-    const MAX_HISTORY_TRIGGER = 20; // 触发总结的历史条数
     const HISTORY_KEEP = 5; // 总结后保留的近期对话数
+    
+    // --- SillyTavern Settings Integration ---
+    const context = SillyTavern.getContext();
+    const SETTINGS_KEY = 'lilith_assistant';
+
+    function getExtensionSettings() {
+        if (!context.extensionSettings[SETTINGS_KEY]) {
+            context.extensionSettings[SETTINGS_KEY] = {};
+        }
+        return context.extensionSettings[SETTINGS_KEY];
+    }
+
+    function saveExtensionSettings() {
+        context.saveSettingsDebounced();
+    }
+    
+    // --- Data Migration (LocalStorage -> ExtensionSettings) ---
+    (function migrateData() {
+        const settings = getExtensionSettings();
+        const legacyKey = 'lilith_data_v23_fix';
+        
+        // Only migrate if settings are empty and legacy data exists
+        if (Object.keys(settings).length === 0 && localStorage.getItem(legacyKey)) {
+            console.log('[Lilith] Migrating data from LocalStorage to ExtensionSettings...');
+            try {
+                // Migrate User State
+                const legacyState = JSON.parse(localStorage.getItem(legacyKey));
+                if (legacyState) settings.userState = legacyState;
+
+                // Migrate Chat History
+                const legacyChat = JSON.parse(localStorage.getItem(legacyKey + '_chat'));
+                if (legacyChat) settings.chatHistory = legacyChat;
+
+                // Migrate Muted Status
+                settings.muted = localStorage.getItem('lilith_muted') === 'true';
+
+                // Migrate API Config
+                settings.apiConfig = {
+                    apiType: localStorage.getItem('lilith_api_type'),
+                    baseUrl: localStorage.getItem('lilith_api_url'),
+                    apiKey: localStorage.getItem('lilith_api_key'),
+                    model: localStorage.getItem('lilith_api_model')
+                };
+
+                saveExtensionSettings();
+                console.log('[Lilith] Migration complete.');
+            } catch (e) {
+                console.error('[Lilith] Migration failed:', e);
+            }
+        }
+    })();
 
     // --- 2. 核心设定：五重人格数据库 ---
     const PERSONA_DB = {
@@ -138,10 +187,10 @@
     }
 
     const AudioSys = {
-        muted: localStorage.getItem('lilith_muted') === 'true',
+        get muted() { return getExtensionSettings().muted === true; },
+        set muted(val) { getExtensionSettings().muted = val; saveExtensionSettings(); },
         toggleMute() {
             this.muted = !this.muted;
-            localStorage.setItem('lilith_muted', this.muted);
             window.speechSynthesis.cancel();
             return this.muted;
         },
@@ -177,22 +226,28 @@
         activePersona: 'toxic'
     };
     
-    let userState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(JSON.stringify(DEFAULT_STATE));
+    let userState = getExtensionSettings().userState;
+    if (!userState) {
+        userState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+    
     if (userState.fatePoints === undefined) userState.fatePoints = 1000;
     if (userState.gachaInventory === undefined) userState.gachaInventory = [];
     if (userState.memoryArchive === undefined) userState.memoryArchive = [];
     if (userState.activePersona === undefined) userState.activePersona = 'toxic';
 
-    let panelChatHistory = [];
-    try {
-        const savedChat = localStorage.getItem(STORAGE_KEY + '_chat');
-        if (savedChat) panelChatHistory = JSON.parse(savedChat);
-    } catch(e) { panelChatHistory = []; }
+    let panelChatHistory = getExtensionSettings().chatHistory || [];
 
-    function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(userState)); updateUI(); }
+    function saveState() { 
+        getExtensionSettings().userState = userState; 
+        saveExtensionSettings(); 
+        updateUI(); 
+    }
+    
     function saveChat() {
         if(panelChatHistory.length > 100) panelChatHistory = panelChatHistory.slice(-100);
-        localStorage.setItem(STORAGE_KEY + '_chat', JSON.stringify(panelChatHistory));
+        getExtensionSettings().chatHistory = panelChatHistory;
+        saveExtensionSettings();
     }
     function updateFavor(n) {
         userState.favorability = Math.max(0, Math.min(100, userState.favorability + parseInt(n)));
@@ -219,11 +274,11 @@
     }
 
     const assistantManager = {
-        config: {
-            apiType: localStorage.getItem('lilith_api_type') || 'native',
-            baseUrl: localStorage.getItem('lilith_api_url') || 'https://generativelanguage.googleapis.com',
-            apiKey: localStorage.getItem('lilith_api_key') || '',
-            model: localStorage.getItem('lilith_api_model') || 'gemini-1.5-flash'
+        config: getExtensionSettings().apiConfig || {
+            apiType: 'native',
+            baseUrl: 'https://generativelanguage.googleapis.com',
+            apiKey: '',
+            model: 'gemini-1.5-flash'
         },
 
         avatarImages: {
@@ -747,11 +802,26 @@
             document.getElementById('cfg-save').addEventListener('click', () => {
                 this.config.apiType = document.getElementById('cfg-type').value; this.config.apiKey = document.getElementById('cfg-key').value.trim(); this.config.baseUrl = document.getElementById('cfg-url').value.trim(); this.config.model = document.getElementById('cfg-model').value.trim();
                 saveState();
-                localStorage.setItem('lilith_api_type', this.config.apiType); localStorage.setItem('lilith_api_key', this.config.apiKey); localStorage.setItem('lilith_api_url', this.config.baseUrl); localStorage.setItem('lilith_api_model', this.config.model);
+                
+                getExtensionSettings().apiConfig = this.config;
+                saveExtensionSettings();
+
                 const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
             });
             document.getElementById('cfg-get-models').addEventListener('click', () => this.fetchModels(parentWin));
-            document.getElementById('cfg-clear-mem').addEventListener('click', () => { if(confirm("要把我也忘了吗？渣男。")) { panelChatHistory = []; localStorage.removeItem(STORAGE_KEY + '_chat'); userState = JSON.parse(JSON.stringify(DEFAULT_STATE)); saveState(); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); updateUI(); } });
+            document.getElementById('cfg-clear-mem').addEventListener('click', () => { 
+                if(confirm("要把我也忘了吗？渣男。")) { 
+                    panelChatHistory = [];
+                    getExtensionSettings().chatHistory = [];
+                    
+                    userState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+                    saveState();
+                    
+                    this.restoreChatHistory(parentWin); 
+                    this.renderMemoryUI(parentWin); 
+                    updateUI(); 
+                } 
+            });
         },
 
         updateAvatarExpression(parentWin, reply) {
