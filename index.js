@@ -121,6 +121,15 @@
     [System Note: Use explicit language.]
     `;
 
+    const LILITH_UI_REGEX = {
+        "scriptName": "[UI]Lilith专属UI_Fix",
+        "findRegex": "(\\[莉莉丝\\])\\s*([^\\n]*)",
+        "replaceString": "<div class=\"lilith-chat-ui\"><div class=\"lilith-chat-avatar\"></div><div class=\"lilith-chat-text\">$2</div></div><style>div.lilith-chat-ui{width:100%;max-width:900px;margin:5px 0;background:linear-gradient(90deg,rgba(48,13,28,0.95) 0%,rgba(128,20,60,0.9) 100%);border-left:4px solid #FF69B4;border-right:4px solid #FF69B4;box-shadow:0 0 15px rgba(255,105,180,0.5),inset 0 0 10px rgba(0,0,0,0.3);border-radius:8px;display:flex;align-items:center;padding:10px;overflow:hidden;color:#f0f0f0;font-family:'Inter','Noto Sans SC',sans-serif}div.lilith-chat-avatar{width:60px;height:60px;min-width:60px;background-image:url('https://i.postimg.cc/rmD7bxxH/IMG-20251102-000620.jpg');background-size:cover;background-position:center;border-radius:50%;border:2px solid #FF69B4;margin-right:15px;box-shadow:0 0 10px rgba(255,105,180,0.7)}div.lilith-chat-text{font-size:0.95em;line-height:1.6;font-weight:500;text-shadow:0 0 5px rgba(255,105,180,0.5)}</style>",
+        "placement": [2],
+        "markdownOnly": true,
+        "runOnEdit": true
+    };
+
     // --- 4. 辅助函数 ---
     function getDynamicPersona() {
         const f = userState.favorability;
@@ -173,7 +182,8 @@
         gachaInventory: [], 
         currentFace: 'normal',
         memoryArchive: [],
-        activePersona: 'toxic'
+        activePersona: 'toxic',
+        autoRoast: false
     };
     
     let userState = JSON.parse(localStorage.getItem(STORAGE_KEY)) || JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -181,6 +191,7 @@
     if (userState.gachaInventory === undefined) userState.gachaInventory = [];
     if (userState.memoryArchive === undefined) userState.memoryArchive = [];
     if (userState.activePersona === undefined) userState.activePersona = 'toxic';
+    if (userState.autoRoast === undefined) userState.autoRoast = false;
 
     let panelChatHistory = [];
     try {
@@ -403,6 +414,60 @@
             }
         },
 
+        installRegex() {
+            if (window.extension_settings && window.extension_settings.regex_scripts) {
+                const scripts = window.extension_settings.regex_scripts;
+                if (!scripts.find(s => s.scriptName === LILITH_UI_REGEX.scriptName)) {
+                    scripts.push(LILITH_UI_REGEX);
+                    if (window.saveSettings) window.saveSettings();
+                    console.log("[Lilith] Regex script installed.");
+                }
+            }
+        },
+
+        async handleAutoRoast(parentWin) {
+            if (!userState.autoRoast) return;
+            // Get the last message from ST context. Context 0 is always the latest message in chat
+            // Wait, getPageContext returns reversed messages if I implemented it that way?
+            // Let's use standard API if possible or DOM. 
+            // Better: use global `chat` object if available.
+            let lastMsg = null;
+            if (Array.isArray(window.chat) && window.chat.length > 0) {
+                lastMsg = window.chat[window.chat.length - 1];
+            } else {
+                // Fallback to DOM
+                const msgs = document.querySelectorAll('.mes');
+                if (msgs.length > 0) {
+                    const lastEl = msgs[msgs.length - 1];
+                    lastMsg = { 
+                        name: lastEl.getAttribute('ch_name'), 
+                        mes: lastEl.querySelector('.mes_text')?.innerText 
+                    };
+                }
+            }
+
+            if (!lastMsg || lastMsg.is_user || lastMsg.name === 'User') return; // Only roast AI
+            // Avoid double roasting
+            if (lastMsg.mes.includes('[莉莉丝]')) return;
+
+            this.showBubble(parentWin, "正在生成吐槽...", "#bd00ff");
+            const roastPrompt = `[Task]: Read the following message from a character and "Roast" it or comment on it from Lilith's perspective (Toxic/Funny).\n[Message]: "${lastMsg.mes}"\n[Output]: Just the comment. Short (1-2 sentences). Chinese.`;
+            const comment = await this.callUniversalAPI(parentWin, roastPrompt, { isChat: false, mode: 'roast' });
+            
+            if (comment) {
+                // Append to the message in ST
+                const newContent = `${lastMsg.mes}\n\n[莉莉丝] ${comment}`;
+                
+                // Update in ST
+                if (Array.isArray(window.chat)) {
+                    window.chat[window.chat.length - 1].mes = newContent;
+                    if (window.updateMessage) window.updateMessage(window.chat.length - 1, newContent); 
+                    else if (window.reloadCurrentChat) window.reloadCurrentChat(); // Fallback
+                }
+                AudioSys.speak(comment);
+            }
+        },
+
         updateFP(parentWin, newVal) {
             userState.fatePoints = newVal; saveState();
             const fpEl = document.getElementById('gacha-fp-val');
@@ -478,6 +543,11 @@
                     </div>
                     <div id="page-config" class="lilith-page">
                          <div class="cfg-group"><label style="color:#bd00ff; font-weight:bold;">🎭 人格覆写 (Persona)</label><select id="cfg-persona-select" style="background:#111; color:#fff; border:1px solid #bd00ff;">${Object.keys(PERSONA_DB).map(k => `<option value="${k}" ${userState.activePersona===k?'selected':''}>${PERSONA_DB[k].name}</option>`).join('')}</select></div>
+                         <div class="cfg-group" style="margin-top:5px; border-top:1px dashed #333; padding-top:5px;">
+                            <label style="color:var(--l-cyan); display:flex; align-items:center; cursor:pointer;">
+                                <input type="checkbox" id="cfg-auto-roast" ${userState.autoRoast ? 'checked' : ''} style="margin-right:5px;"> 启用自动吐槽 (Auto Roast)
+                            </label>
+                         </div>
                          <div class="cfg-group"><label>大脑皮层 (Model)</label><div style="display:flex; gap:5px;"><input type="text" id="cfg-model" value="${this.config.model}" style="flex:1;"><button id="cfg-get-models" class="btn-cyan">扫描</button></div><select id="cfg-model-select" style="display:none; margin-top:5px;"></select></div>
                          <div class="cfg-group"><label>神经密钥 (API Key)</label><input type="password" id="cfg-key" value="${this.config.apiKey}"></div>
                          <div class="cfg-group"><label>接口地址 (Endpoint)</label><input type="text" id="cfg-url" value="${this.config.baseUrl}"></div>
@@ -488,7 +558,17 @@
                 </div>
             `;
             wrapper.appendChild(panel); wrapper.appendChild(avatar); document.body.appendChild(wrapper);
-            this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); updateUI();
+            this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin); 
+            this.installRegex();
+            
+            // Hook into generation end
+            if (window.eventSource) {
+                window.eventSource.on(window.event_types?.GENERATION_STOPPED || 'generation_stopped', () => {
+                    setTimeout(() => this.handleAutoRoast(parentWin), 500);
+                });
+            }
+            
+            updateUI();
         },
 
         restoreChatHistory(parentWin) {
@@ -743,6 +823,8 @@
             });
             document.getElementById('cfg-save').addEventListener('click', () => {
                 this.config.apiType = document.getElementById('cfg-type').value; this.config.apiKey = document.getElementById('cfg-key').value.trim(); this.config.baseUrl = document.getElementById('cfg-url').value.trim(); this.config.model = document.getElementById('cfg-model').value.trim();
+                userState.autoRoast = document.getElementById('cfg-auto-roast').checked;
+                saveState();
                 localStorage.setItem('lilith_api_type', this.config.apiType); localStorage.setItem('lilith_api_key', this.config.apiKey); localStorage.setItem('lilith_api_url', this.config.baseUrl); localStorage.setItem('lilith_api_model', this.config.model);
                 const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
             });
