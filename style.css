@@ -60,16 +60,26 @@ div.lilith-chat-text {
     pointer-events: none; 
 }
 
+#lilith-avatar-box {
+    position: relative;
+    z-index: 20;
+    pointer-events: none; /* 让鼠标事件穿透到 avatar */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: -40px; /* 抵消面板顶部空白 */
+}
+
 #lilith-avatar-cn { 
     position: relative; 
-    z-index: 20;
+    z-index: 21;
     width: 80px; height: 80px; 
     background: url('https://i.postimg.cc/YSHhNdJT/IMG_20260130_143415.png') center/cover; 
     clip-path: polygon(15% 0, 100% 0, 100% 85%, 85% 100%, 0 100%, 0 15%);
     border: 2px solid var(--l-main); 
     box-shadow: 0 0 25px rgba(255, 0, 85, 0.4); 
     cursor: move; 
-    margin-bottom: -40px;
+    /* margin-bottom: -40px; 移到了 avatar-box */
     transition: 0.2s;
     pointer-events: auto;
 }
@@ -77,11 +87,12 @@ div.lilith-chat-text {
 
 #lilith-bubble-cn { 
     position: absolute; 
-    bottom: calc(100% - 30px);
+    bottom: 100%; /* 精确位于容器顶部 */
     left: 50%;
     transform: translateX(-50%);
     width: 220px; 
     max-width: 80vw;
+    margin-bottom: 10px; /* 气泡与头像的间距 */
     background: rgba(0,0,0,0.9); 
     border: 1px solid var(--l-main);
     border-top: 4px solid var(--l-main);
