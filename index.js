@@ -734,7 +734,7 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
                     </div>
                 </div>
             `;
-            wrapper.appendChild(panel); wrapper.appendChild(avatar); document.body.appendChild(wrapper);
+            wrapper.appendChild(avatar); wrapper.appendChild(panel); document.body.appendChild(wrapper);
             this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin);
             
             this.setAvatar(parentWin);
