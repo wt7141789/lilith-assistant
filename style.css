@@ -78,7 +78,7 @@ div.lilith-chat-text {
 
 #lilith-bubble-cn { 
     position: absolute; 
-    bottom: calc(100% - 20px);
+    bottom: calc(100% - 60px);
     left: 50%;
     transform: translateX(-50%);
     width: 220px; 
