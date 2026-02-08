@@ -43,6 +43,9 @@ div.lilith-chat-text {
     line-height: 1.6;
     font-weight: 500;
     text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
+    white-space: pre-wrap;
+    word-break: break-all;
+    flex: 1; /* 确保占据剩余空间 */
 }
 
 /* 悬浮助手样式 (来自原脚本 cssManage) */
@@ -79,16 +82,18 @@ div.lilith-chat-text {
     position: absolute; 
     top: 10px; 
     left: 90px;
-    width: 180px; 
-    background: rgba(0,0,0,0.9); 
+    width: 200px; /* 略微拓宽 */
+    background: rgba(0,0,0,0.95); 
     border: 1px solid var(--l-main);
     border-left: 4px solid var(--l-main);
-    color: #fff; padding: 10px; font-size: 12px; 
+    color: #fff; padding: 10px; font-size: 13px; 
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     backdrop-filter: blur(5px);
     z-index: 30;
     cursor: pointer;
     pointer-events: auto;
+    word-break: break-word; /* 强制包裹 */
+    line-height: 1.4;
 }
 
 #lilith-panel-cn { 

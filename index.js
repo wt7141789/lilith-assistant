@@ -655,6 +655,16 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
                 return;
             }
 
+            // 显示思考状态
+            const thinkingPrompts = [
+                "让我看看你又说了什么蠢话... 💭",
+                "思考中... 这种回复也亏你想得出来。 💢",
+                "正在构思如何优雅地吐槽你... 🔍",
+                "正在锐评中... ⚖️"
+            ];
+            const randomThinking = thinkingPrompts[Math.floor(Math.random() * thinkingPrompts.length)];
+            this.say(randomThinking);
+
             const chatLog = getPageContext(5).map(m => `${m.name}: ${m.message}`).join('\n');
             const persona = PERSONA_DB[userState.activePersona] || PERSONA_DB['toxic'];
             
