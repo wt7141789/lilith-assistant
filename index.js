@@ -794,12 +794,8 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                                 console.warn('[Lilith] No refresh function found. UI might be desynced until manual refresh.');
                             }
 
-                            // 3. 强制触发 UI 渲染检查 - 解决“UI不显示”的问题
-                            // 这里的延迟是为了等待 ST 的 DOM 渲染完成
-                            setTimeout(() => {
-                                console.log('[Lilith] Performing post-refresh UI check for:', messageId);
-                                handleMessageRendered(null, messageId, true);
-                            }, 800);
+                            // 3. 吐槽播报
+                            AudioSys.speak(cleanComment.replace(/\[莉莉丝\]/g, '').trim());
 
                             console.log('[Lilith] Comment injected and refreshed for message', messageId);
                          } catch (e) {
@@ -1725,46 +1721,6 @@ The user just received a reply. Your job is to interject with a short, sharp, an
         });
     }
 
-    // 监听消息渲染事件
-    function handleMessageRendered(type, messageId, shouldSpeak = false) {
-        const messageElement = $(`.mes[mes_id="${messageId}"]`);
-        if (!messageElement.length) return;
-
-        const textElement = messageElement.find('.mes_text');
-        let html = textElement.html();
-        if (!html || !html.includes('[莉莉丝]')) return;
-        
-        // 匹配 [莉莉丝] 及其内容，直到遇到换行或 HTML 标签结束
-        const regex = /\[莉莉丝\]\s*([\s\S]*?)(?=<br\s*\/?>|<\/p>|\n|$)/gi;
-        
-        let hasChanged = false;
-        let lastComment = "";
-
-        const newHtml = html.replace(regex, (match, content) => {
-            const clean = content.replace(/<[^>]*>/g, '').trim(); 
-            if (!clean) return match;
-            hasChanged = true;
-            lastComment = clean;
-            return `
-                <div class="lilith-chat-ui">
-                    <div class="lilith-chat-avatar"></div>
-                    <div class="lilith-chat-text">${lastComment}</div> 
-                </div>
-            `;
-        });
-        
-        if (hasChanged) {
-            // 如果已经包含 UI 类名，且 HTML 内容没变（意味着正则已经处理过），则不重复赋值
-            if (messageElement.find('.lilith-chat-ui').length && html === newHtml) return;
-            
-            textElement.html(newHtml);
-            if (shouldSpeak && lastComment) {
-                 const textToSpeak = lastComment.replace(/<[^>]*>/g, '').trim(); 
-                 AudioSys.speak(textToSpeak);
-            }
-        }
-    }
-
     // 这里的 jQuery(document).ready 是 ST 加载插件的常规方式
     jQuery(document).ready(function() {
         // 尝试监听 APP_READY 事件，这是更标准的做法
@@ -1785,28 +1741,6 @@ The user just received a reply. Your job is to interject with a short, sharp, an
              setTimeout(tryInit, 1000); 
         } else {
              tryInit();
-        }
-        
-        // 绑定消息渲染观测
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1 && $(node).hasClass('mes')) {
-                        const mesId = $(node).attr('mes_id');
-                        if (mesId) handleMessageRendered(null, mesId, true);
-                    }
-                });
-            });
-        });
-
-        const chatContainer = document.getElementById('chat');
-        if (chatContainer) {
-            observer.observe(chatContainer, { childList: true });
-            // 处理已有消息
-            $('.mes').each(function() {
-                const mesId = $(this).attr('mes_id');
-                if (mesId) handleMessageRendered(null, mesId, false);
-            });
         }
     });
 
