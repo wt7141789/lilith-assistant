@@ -663,7 +663,7 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
                 "正在锐评中... ⚖️"
             ];
             const randomThinking = thinkingPrompts[Math.floor(Math.random() * thinkingPrompts.length)];
-            this.say(randomThinking);
+            this.showBubble(window, randomThinking);
 
             const chatLog = getPageContext(5).map(m => `${m.name}: ${m.message}`).join('\n');
             const persona = PERSONA_DB[userState.activePersona] || PERSONA_DB['toxic'];

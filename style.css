@@ -157,7 +157,7 @@ div.lilith-chat-text {
 #page-tools::-webkit-scrollbar-thumb, #page-gacha::-webkit-scrollbar-thumb, #page-config::-webkit-scrollbar-thumb, #page-memory::-webkit-scrollbar-thumb { background: var(--l-main); }
 
 #lilith-chat-history { flex: 1; overflow-y: auto; margin-bottom: 10px; scrollbar-width: thin; scrollbar-color: var(--l-main) #111; padding-right:5px; }
-.msg { margin-bottom: 8px; padding: 8px 10px; font-size: 13px; max-width: 90%; word-break: break-all; border-left: 2px solid transparent; }
+.msg { margin-bottom: 8px; padding: 8px 10px; font-size: 13px; max-width: 90%; word-break: break-word; white-space: pre-wrap; border-left: 2px solid transparent; line-height: 1.4; }
 .msg.user { background: rgba(255,255,255,0.05); align-self: flex-end; margin-left: auto; border-left: none; border-right: 2px solid #666; color: #aaa; }
 .msg.lilith { background: rgba(255,0,85,0.08); color: #ffccdd; border-left: 2px solid var(--l-main); text-shadow: 0 0 2px rgba(255,0,85,0.3); }
 
@@ -307,6 +307,7 @@ div.lilith-chat-text {
 @keyframes glitch-anim-1 { 0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px,0); } 20% { clip-path: inset(60% 0 10% 0); transform: translate(2px,0); } 40% { clip-path: inset(40% 0 50% 0); transform: translate(-2px,0); } 60% { clip-path: inset(80% 0 5% 0); transform: translate(2px,0); } 80% { clip-path: inset(10% 0 70% 0); transform: translate(-2px,0); } 100% { clip-path: inset(30% 0 50% 0); transform: translate(2px,0); } }
 @keyframes glitch-anim-2 { 0% { clip-path: inset(10% 0 60% 0); transform: translate(2px,0); } 20% { clip-path: inset(30% 0 20% 0); transform: translate(-2px,0); } 40% { clip-path: inset(70% 0 30% 0); transform: translate(2px,0); } 60% { clip-path: inset(20% 0 60% 0); transform: translate(-2px,0); } 80% { clip-path: inset(50% 0 20% 0); transform: translate(2px,0); } 100% { clip-path: inset(10% 0 80% 0); transform: translate(-2px,0); } }
 
+.msg.lilith {
     color: #ffb3c1;
     border-left: 2px solid var(--l-main);
 }
