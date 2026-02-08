@@ -408,32 +408,24 @@
 
         createDrawerButton(parentWin) {
             const insertBtn = () => {
-                // 尝试多个可能的 ID，兼容不同版本的酒馆
-                // 1. #left-drawer (旧版/标准版)
-                // 2. #side-bar (某些魔改版)
-                // 3. #rm_extensions_block (扩展栏位置)
-                // 4. .drawer-content (通用类名)
-                // 5. #extensions_settings (设置面板内)
-                const targets = [
-                    document.getElementById('left-drawer'),
-                    document.getElementById('side-bar'),
-                    document.getElementById('rm_extensions_block'),
-                    document.querySelector('.drawer-content'),
-                    document.querySelector('#extensions_settings .inline-drawer-content')
-                ];
-                
-                const drawer = targets.find(t => t);
-                
-                if (drawer && !document.getElementById('lilith-drawer-btn')) {
-                    console.log('[Lilith] Found drawer container:', drawer.id || drawer.className);
+                // 优先定位标准的 #left-drawer，如用户文档所述
+                const drawer = document.getElementById('left-drawer');
+                               
+                if (drawer) {
+                    // 检查按钮是否已存在且在当前 DOM 中
+                    if (document.getElementById('lilith-drawer-btn')) {
+                        return true;
+                    }
+
+                    console.log('[Lilith] Found #left-drawer, injecting button...');
                     
                     const btn = document.createElement('div');
                     btn.id = 'lilith-drawer-btn';
                     // 使用酒馆原生类名
                     btn.className = 'menu_button clickable drawer-item';
                     
-                    // 强制样式，防止被覆盖
-                    btn.style.cssText = 'display:flex !important; align-items:center; gap:10px; padding:10px 15px; border-bottom:1px solid rgba(255,255,255,0.1); cursor:pointer; color:#ff0055; font-weight:bold; transition: 0.2s; background: rgba(0,0,0,0.2); margin-bottom: 5px; border-radius: 5px;';
+                    // 强制样式
+                    btn.style.cssText = 'display:flex !important; align-items:center; gap:10px; padding:10px 15px; border-bottom:1px solid rgba(255,255,255,0.1); cursor:pointer; color:#ff0055; font-weight:bold; transition: 0.2s; background: rgba(0,0,0,0.2); order:-1;';
                     btn.innerHTML = '<span style="font-size:18px;">😈</span><span style="font-size:14px;">莉莉丝助手</span>';
                     
                     btn.onmouseenter = () => btn.style.background = 'rgba(255,0,85,0.15)';
@@ -447,38 +439,40 @@
                         
                         // 移动端自动收起
                         if (window.innerWidth < 800) {
-                            const closeBtn = document.getElementById('left-drawer-close') || document.querySelector('.drawer-close');
+                            const closeBtn = document.getElementById('left-drawer-close');
                             if (closeBtn) closeBtn.click();
                         }
                     };
                     
-                    // 如果是列表容器，插到最前；如果是扩展块，插在该块之前或者内部
-                    if (drawer.id === 'rm_extensions_block') {
-                         drawer.parentElement.insertBefore(btn, drawer);
-                    } else {
-                         drawer.prepend(btn);
-                    }
-                    
-                    console.log('[Lilith] Drawer button injected successfully.');
+                    // 尝试插入到顶部
+                    // 某些版本中，left-drawer下可能有特定的容器，我们简单粗暴地用 prepend
+                    drawer.prepend(btn);
+                    console.log('[Lilith] Button injected.');
                     return true;
                 }
                 return false;
             };
 
             // 初始尝试
-            if (!insertBtn()) {
-                console.log('[Lilith] Drawer not found immediately, starting poller...');
-                let attempts = 0;
-                const interval = setInterval(() => {
-                    attempts++;
-                    if (insertBtn()) {
-                        clearInterval(interval);
-                    } else if (attempts > 20) { // 增加尝试次数到20次 (20秒)
-                        console.warn('[Lilith] Failed to inject drawer button after 20s. UI might be incompatible.');
-                        clearInterval(interval);
-                    }
-                }, 1000);
-            }
+            insertBtn();
+
+            // 建立 MutationObserver 以确保按钮常驻 (保活机制)
+            // 很多时候酒馆会重绘侧边栏
+            const observer = new MutationObserver((mutations) => {
+                // 简单防抖，只要有变动就检查一下
+                insertBtn();
+            });
+
+            // 持续寻找 left-drawer 进行挂载
+            const containerPoller = setInterval(() => {
+                const drawer = document.getElementById('left-drawer');
+                if (drawer) {
+                    observer.observe(drawer, { childList: true, subtree: false });
+                    insertBtn();
+                    clearInterval(containerPoller);
+                    console.log('[Lilith] Drawer observer attached.');
+                }
+            }, 1000);
         },
 
         lastActivityTime: Date.now(),
@@ -1260,7 +1254,25 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
 
     // 这里的 jQuery(document).ready 是 ST 加载插件的常规方式
     jQuery(document).ready(function() {
-        init();
+        // 尝试监听 APP_READY 事件，这是更标准的做法
+        // 但为了兼容，如果 eventSource 不可用，就直接 init
+        const tryInit = () => {
+             // 避免重复初始化
+             if (window._lilithInitialized) return;
+             window._lilithInitialized = true;
+             init();
+        };
+
+        if (window.eventSource && window.event_types) {
+             window.eventSource.on(window.event_types.APP_READY, () => {
+                 console.log('[Lilith] APP_READY received.');
+                 tryInit();
+             });
+             // 防止插件加载晚了，miss 掉了 APP_READY
+             setTimeout(tryInit, 1000); 
+        } else {
+             tryInit();
+        }
         
         // 绑定消息渲染观测
         const observer = new MutationObserver((mutations) => {
