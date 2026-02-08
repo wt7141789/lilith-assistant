@@ -712,11 +712,29 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     const targetMsgRef = chatData[finalIndex];
                     if (!targetMsgRef) throw new Error("Could not find targets message in chat array");
 
-                    // 2. 更新内存数据 - 始终追加在末尾 (移除卡顿的随机插入逻辑)
+                    // 2. 更新内存数据
                     const cleanComment = comment.trim();
                     const msgText = targetMsgRef.mes;
 
-                    if (userState.commentMode === 'top') {
+                    if (userState.commentMode === 'random') {
+                        // 随机插入逻辑：寻找正文中的标点符号断句处
+                        const splitters = /([。！？\.\!\?]+)/g;
+                        const parts = msgText.trim().split(splitters);
+                        
+                        if (parts.length > 2) {
+                            // 随机选择一个断句点 (偶数索引是文字，奇数索引是标点)
+                            // 我们在标点后面插入换行和吐槽
+                            const pairCount = Math.floor(parts.length / 2);
+                            const randomPairIndex = Math.floor(Math.random() * pairCount);
+                            const splitIndex = randomPairIndex * 2 + 1;
+                            
+                            parts[splitIndex] += `\n\n${cleanComment}\n\n`;
+                            targetMsgRef.mes = parts.join('');
+                        } else {
+                            // 只有一句话，追加在末尾
+                            targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
+                        }
+                    } else if (userState.commentMode === 'top') {
                         targetMsgRef.mes = `${cleanComment}\n\n` + msgText.trim();
                     } else {
                         // 始终追加在末尾
@@ -848,6 +866,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                                 <label style="font-size:12px; color:#ccc;">插入模式:</label>
                                 <select id="cfg-comment-mode" style="background:#111; color:#fff; border:1px solid #444; font-size:12px; height:24px;">
                                     <option value="bottom" ${userState.commentMode === 'bottom' ? 'selected' : ''}>⬇️ 始终追加在末尾</option>
+                                    <option value="random" ${userState.commentMode === 'random' ? 'selected' : ''}>🎲 随机文本内插入</option>
                                     <option value="top" ${userState.commentMode === 'top' ? 'selected' : ''}>⬆️ 始终插入到顶端</option>
                                 </select>
                             </div>
@@ -1272,7 +1291,12 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 commentModeSelect.addEventListener('change', () => {
                     userState.commentMode = commentModeSelect.value;
                     saveState();
-                    this.showBubble(parentWin, `模式已切换: ${userState.commentMode === 'random' ? '随机正文插入' : '末尾追加'}`);
+                    const modeMap = {
+                        'bottom': '末尾追加',
+                        'random': '随机文本插入',
+                        'top': '顶端置顶'
+                    };
+                    this.showBubble(parentWin, `插入模式已更新: ${modeMap[userState.commentMode] || userState.commentMode}`);
                 });
             }
 
