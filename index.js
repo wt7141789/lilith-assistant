@@ -741,35 +741,12 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     
                     // 3. 触发渲染
                     console.log('[Lilith] Updating message block for index:', finalIndex);
-                    // 引入 100ms 强制延迟，确保 ST 内部状态机完成写入
-                    setTimeout(() => {
-                        try {
-                            const freshContext = SillyTavern.getContext();
-                            // 极速获取全局刷新函数（优先原始函数）
-                            const updateFn = window.updateMessageBlock || 
-                                           (typeof updateMessageBlock === 'function' ? updateMessageBlock : null) ||
-                                           freshContext.updateMessageBlock;
 
-                            // 只有在数据真正安全存在时才刷新
-                            if (typeof updateFn === 'function' && 
-                                freshContext.chat && 
-                                freshContext.chat[finalIndex] && 
-                                typeof freshContext.chat[finalIndex].mes !== 'undefined') {
-                                
-                                console.log('[Lilith] SillyTavern refresh API started.');
-                                updateFn(finalIndex);
-                            } else {
-                                throw new Error("Update environment check failed");
-                            }
-                        } catch (err) {
-                            console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch fallback.', err);
-                            // 最终兜底：如果是严重的 TypeError，强制全量刷新一次
-                            if (err instanceof TypeError && typeof viewAllMessages === 'function') {
-                                viewAllMessages();
-                            }
-                        }
-                    }, 100);
-
+                    // [Fix] 移除不稳定的 updateMessageBlock 调用
+                    // 直接使用下方的 Manual DOM Patch 进行视觉更新
+                    // 内存中的 chat 数据已更新，下次重绘会自动生效
+                    console.log('[Lilith] Skipping potentially unstable API refresh, relying on manual DOM patch.');
+                    
                     // 4. 彻底暴力 DOM 补丁 (全量扫描并应用)
                     // 增加延迟确保酒馆自己的渲染已经完成，然后我们覆盖它
                     setTimeout(() => {
