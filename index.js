@@ -661,15 +661,19 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
             const systemPrompt = `[System Task: Chat Interjection]
 You are ${persona.name}. You are observing the user's conversation with another character.
 The user just received a reply. Your job is to interject with a short, sharp, and very ${userState.activePersona} comment.
-Instruction:
-- Keep it short (under 50 words).
-- MUST start with "[莉莉丝]".
-- If Toxic: Mock the character for being too weak or the user for being a simp.
-- If Brat: Call them LOSERS.
-- If Wife: Be slightly jealous or teasing.
-- Output ONLY the comment.`;
 
-            const userPrompt = `Current Chat Context:\n${chatLog}\n\n[Task]: Comment on the last message from ${targetMsg.name}.`;
+[DIVERSITY & CONTENT GUIDELINES]:
+- DO NOT REPEAT YOURSELF.
+- Pick a random angle: Mock the character's line, tease the user's reaction, breakdown the logic of the scene, or just be a chaotic observer.
+- If Sanity < 30: Be more unhinged, obsessive, or sinister.
+- If Favor > 80: Be protective but still teasing.
+
+[CONSTRAINTS]:
+- Keep it short (under 40 words).
+- MUST start with "[莉莉丝]".
+- Output ONLY the comment text.`;
+
+            const userPrompt = `Current Chat Context:\n${chatLog}\n\n[Task]: Comment on the last message from ${targetMsg.name}. Current Mood: ${userState.sanity < 30 ? 'Unhinged' : 'Normal'}.`;
 
             try {
                 const comment = await this.callUniversalAPI(window, userPrompt, { isChat: false, systemPrompt: systemPrompt });
@@ -693,15 +697,18 @@ Instruction:
                         const textToSpeak = comment.replace('[莉莉丝]', '').replace(/<[^>]*>/g, '').trim(); 
                         AudioSys.speak(textToSpeak);
                     } else {
-                        // 降级刷新：尝试按 ID 找，找不到找最后一条
-                        let textElement = $(`.mes[mes_id="${messageId}"] .mes_text`);
-                        if (!textElement.length) textElement = $('.mes:last .mes_text');
-                        
+                        // 降级本地补丁：按 ID 或 Index 找 DOM
+                        let mesBlock = $(`.mes[mes_id="${messageId}"]`);
+                        if (!mesBlock.length && typeof messageId === 'number') mesBlock = $(`.mes`).eq(messageId);
+                        if (!mesBlock.length) mesBlock = $(`.mes:last`);
+
+                        const textElement = mesBlock.find('.mes_text');
                         if (textElement.length) {
-                             textElement.append(`<br><br>${comment.trim()}`);
-                             // 重新调用处理函数美化 UI
-                             const finalMesId = textElement.closest('.mes').attr('mes_id');
-                             handleMessageRendered(null, finalMesId, true);
+                             // 使用 ST 的渲染逻辑手动模拟正则转换，或者简单刷新内容
+                             // 这里最稳妥的是直接触发重绘，或者手动替换 html
+                             // 我们已知正文已经更新了 targetMsg.mes，直接用 handleMessageRendered 处理
+                             textElement.html(targetMsg.mes.replace(/\n\n/g, '<br><br>')); 
+                             handleMessageRendered(null, mesBlock.attr('mes_id'), true);
                         }
                     }
 
@@ -1300,11 +1307,56 @@ Instruction:
         assistantManager.setAvatar();
     }
 
+    /**
+     * 自动注入全局正则 - 用于确保 UI 渲染在任何情况下都能生效 (无需刷新)
+     */
+    function ensureGlobalRegex() {
+        console.log('[Lilith] Checking for global regex rules...');
+        try {
+            const context = SillyTavern.getContext();
+            if (!context || !context.settings || !context.settings.regex) return;
+
+            const regexList = context.settings.regex;
+            const ruleName = 'lilith-comment-ui';
+            const exists = regexList.some(r => r.runOnName === ruleName); 
+
+            if (exists) {
+                console.log('[Lilith] UI Regex already exists.');
+                return;
+            }
+
+            console.log('[Lilith] UI Regex missing. Injecting now...');
+            // 这是一个专门为莉莉丝设计的正向渲染规则
+            const newRule = {
+                name: "【莉莉丝】吐槽卡片渲染",
+                regex: "\\[莉莉丝\\]([\\s\\S]*?)(?=\\n\n|$)", 
+                replacement: " <div class=\"lilith-chat-ui\"><div class=\"lilith-chat-avatar\"></div><div class=\"lilith-chat-text\">$1</div></div>",
+                placement: [2], // 仅聊天正文
+                disabled: false,
+                markdownOnly: false,
+                runOnName: ruleName,
+                isCustom: true
+            };
+
+            regexList.push(newRule);
+            // 触发 ST 的设置保存
+            if (typeof window.saveSettingsDebounced === 'function') {
+                window.saveSettingsDebounced();
+            }
+            console.log('[Lilith] UI Regex injected successfully.');
+        } catch (e) {
+            console.warn('[Lilith] Failed to inject regex:', e);
+        }
+    }
+
     // --- ST Extension Loader ---
     function init() {
         console.log('[Lilith] Initializing Assistant Extension...');
         assistantManager.initStruct();
         
+        // 自动注入正则
+        ensureGlobalRegex();
+
         try {
             const context = SillyTavern.getContext();
             const { eventSource, event_types } = context;
