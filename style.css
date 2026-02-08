@@ -74,7 +74,7 @@ div.lilith-chat-text {
     position: relative; 
     z-index: 21;
     width: 80px; height: 80px; 
-    background: url('https://i.postimg.cc/YSHhNdJT/IMG_20260130_143415.png') center/cover; 
+    background: url('assets/meme_normal.png') center/cover; 
     clip-path: polygon(15% 0, 100% 0, 100% 85%, 85% 100%, 0 100%, 0 15%);
     border: 2px solid var(--l-main); 
     box-shadow: 0 0 25px rgba(255, 0, 85, 0.4); 
@@ -487,3 +487,15 @@ div.lilith-chat-text {
 #lilith-drawer-btn:hover::before {
     transform: translateX(100%);
 }
+
+.l-cfg-box input[type=range] { -webkit-appearance: none; width: 100%; background: rgba(255,255,255,0.1); border-radius: 10px; height: 6px; }
+.l-cfg-box input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00f3ff; cursor: pointer; box-shadow: 0 0 10px #00f3ff; }
+
+.l-trivia-box { background: rgba(0,0,0,0.8); border: 2px solid #00f3ff; padding: 15px; color: #fff; width: 300px; text-align: center; }
+.l-trivia-timer { height: 4px; background: #00f3ff; width: 100%; transition: width linear 1s; }
+.l-ans-btn { display: block; width: 100%; margin: 5px 0; padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid #555; color: #fff; cursor: pointer; }
+.l-ans-btn:hover { background: rgba(0, 243, 255, 0.2); }
+
+#lilith-glitch-layer { pointer-events: none; }
+.sanity-critical { animation: sanity-shake 0.1s infinite !important; filter: contrast(200%) brightness(150%) hue-rotate(90deg) !important; }
+@keyframes sanity-shake { 0% { transform: translate(0,0); } 25% { transform: translate(2px, 2px); } 50% { transform: translate(-2px, -2px); } 75% { transform: translate(2px, -2px); } 100% { transform: translate(-2px, 2px); } }
