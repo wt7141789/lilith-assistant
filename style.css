@@ -92,7 +92,9 @@ div.lilith-chat-text {
     z-index: 30;
     cursor: pointer;
     pointer-events: auto;
-    word-break: break-word; /* 强制包裹 */
+    word-wrap: break-word; /* 确保包裹 */
+    word-break: normal;
+    white-space: pre-wrap;
     line-height: 1.4;
 }
 

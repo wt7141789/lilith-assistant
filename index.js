@@ -691,44 +691,56 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             try {
                 const comment = await this.callUniversalAPI(window, userPrompt, { isChat: false, systemPrompt: systemPrompt });
                 if (comment && comment.includes('[莉莉丝]')) {
-                    // 1. 更新内存数据 - 随机选择插入位置
+                    // 获取最新上下文并确保我们正在修改正确的对象
+                    const currentContext = SillyTavern.getContext();
+                    const chatData = currentContext.chat;
+                    
+                    // 1. 重新锁定索引，确保修改的是内存中的实时引用
+                    let finalIndex = chatData.findIndex(m => m.mes_id == messageId);
+                    if (finalIndex === -1) {
+                        // 兜底：如果 ID 找不到，且 ID 是数字，尝试作为索引；否则取最后一条
+                        if (typeof messageId === 'number' && messageId < chatData.length) {
+                            finalIndex = messageId;
+                        } else {
+                            finalIndex = chatData.length - 1;
+                        }
+                    }
+
+                    const targetMsgRef = chatData[finalIndex];
+                    if (!targetMsgRef) throw new Error("Could not find targets message in chat array");
+
+                    // 2. 更新内存数据 - 随机选择插入位置
                     const pDelimiter = '\n\n';
-                    const parts = targetMsg.mes.split(pDelimiter).filter(p => p.trim());
+                    const parts = targetMsgRef.mes.split(pDelimiter).filter(p => p.trim());
                     
                     if (parts.length >= 2) {
                         const insertIndex = Math.floor(Math.random() * (parts.length - 1)) + 1;
                         parts.splice(insertIndex, 0, comment.trim());
-                        targetMsg.mes = parts.join(pDelimiter);
+                        targetMsgRef.mes = parts.join(pDelimiter);
                     } else {
-                        targetMsg.mes += `\n\n${comment.trim()}`;
+                        targetMsgRef.mes += `\n\n${comment.trim()}`;
                     }
                     
-                    // 2. 更新 DOM 并触发渲染
-                    const chatData = SillyTavern.getContext().chat;
-                    const targetIndex = chatData.findIndex(m => m.mes_id == messageId);
-                    // 确保索引在有效范围内
-                    const finalIndex = targetIndex !== -1 ? targetIndex : (chatData.length - 1);
-
-                    if (typeof context.updateMessageBlock === 'function' && chatData[finalIndex]) {
-                        console.log('[Lilith] Updating message block at index:', finalIndex);
-                        try {
-                            context.updateMessageBlock(finalIndex);
-                        } catch (err) {
-                            console.warn('[Lilith] updateMessageBlock failed, falling back to printMessages', err);
-                            if (context.printMessages) context.printMessages();
+                    // 3. 触发渲染
+                    console.log('[Lilith] Updating message block at index:', finalIndex);
+                    try {
+                        // SillyTavern 的 updateMessageBlock 期望的是数组下标
+                        if (typeof currentContext.updateMessageBlock === 'function') {
+                            currentContext.updateMessageBlock(finalIndex);
+                        } else if (typeof currentContext.printMessages === 'function') {
+                            currentContext.printMessages();
                         }
-                    } else if (typeof context.printMessages === 'function') {
-                        context.printMessages();
+                    } catch (err) {
+                        console.warn('[Lilith] UI Update failed, forcing printMessages', err);
+                        if (currentContext.printMessages) currentContext.printMessages();
                     }
 
-                    // 3. 双保险：如果 UI 没反应，直接暴力修改当前最后几个消息的 HTML
+                    // 4. 暴力 DOM 补丁 (双重保险)
                     setTimeout(() => {
-                        const targetEl = $(`.mes[mes_id="${messageId}"] .mes_text`).last();
+                        const targetEl = $(`.mes[mes_id="${messageId}"] .mes_text`).last() || $(`.mes:last .mes_text`);
                         if (targetEl.length && !targetEl.html().includes('lilith-chat-ui')) {
                             console.log('[Lilith] Manual DOM Patching for message', messageId);
-                            // 手动模拟正则替换渲染
-                            const rawText = targetMsg.mes;
-                            const rendered = rawText.replace(/\n/g, '<br>').replace(/\[莉莉丝\]\s*([^\n<]*)/g, `
+                            const rendered = targetMsgRef.mes.replace(/\n/g, '<br>').replace(/\[莉莉丝\]\s*([^\n<]*)/g, `
                                 <div class="lilith-chat-ui">
                                     <div class="lilith-chat-avatar"></div>
                                     <div class="lilith-chat-text">$1</div>
@@ -736,13 +748,13 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                             `);
                             targetEl.html(rendered);
                         }
-                    }, 100);
+                    }, 200);
 
                     const textToSpeak = comment.replace('[莉莉丝]', '').replace(/<[^>]*>/g, '').trim(); 
                     AudioSys.speak(textToSpeak);
 
-                    // 3. 保存到 ST 存档
-                    if (typeof context.saveChat === 'function') context.saveChat();
+                    // 5. 保存到 ST 存档
+                    if (typeof currentContext.saveChat === 'function') currentContext.saveChat();
                     
                     console.log('[Lilith] Comment injected and rendered for message', messageId);
                 }
