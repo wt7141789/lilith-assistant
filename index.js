@@ -1588,7 +1588,48 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     id: "lilith-ui-injector-v2", 
                     scriptName: regexName,
                     findRegex: "(\\[莉莉丝\\])\\s*([^\\n]*)",
-                    replaceString: `\n<span class="lilith-chat-ui-wrapper">\n    <span class="lilith-chat-ui">\n        <span class="lilith-chat-avatar"></span>\n        <span class="lilith-chat-text">$2</span>\n    </span>\n</span>\n`,
+                    replaceString: `
+<style>
+    div.lilith-chat-ui {
+        width: 100%;
+        max-width: 900px; 
+        margin: 5px 0; 
+        background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%);
+        border-left: 4px solid #FF69B4; 
+        border-right: 4px solid #FF69B4;
+        box-shadow: 0 0 15px rgba(255, 105, 180, 0.5), inset 0 0 10px rgba(0,0,0,0.3);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        overflow: hidden;
+        color: #f0f0f0;
+        font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    }
+    div.lilith-chat-avatar {
+        width: 60px;
+        height: 60px;
+        min-width: 60px;
+        background-image: url('https://i.postimg.cc/rmD7bxxH/IMG-20251102-000620.jpg'); 
+        background-size: cover;
+        background-position: center;
+        border-radius: 50%;
+        border: 2px solid #FF69B4;
+        margin-right: 15px;
+        box-shadow: 0 0 10px rgba(255, 105, 180, 0.7);
+    }
+    div.lilith-chat-text {
+        font-size: 0.95em;
+        line-height: 1.6;
+        font-weight: 500;
+        text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
+    }
+</style>
+<div class="lilith-chat-ui">
+    <div class="lilith-chat-avatar"></div>
+    <div class="lilith-chat-text">$2</div> 
+</div>
+`,
                     trimStrings: [],
                     placement: [2],
                     disabled: false, 
@@ -1705,12 +1746,10 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             hasChanged = true;
             lastComment = clean;
             return `
-                <span class="lilith-chat-ui-wrapper">
-                    <span class="lilith-chat-ui">
-                        <span class="lilith-chat-avatar"></span>
-                        <span class="lilith-chat-text">${lastComment}</span>
-                    </span>
-                </span>
+                <div class="lilith-chat-ui">
+                    <div class="lilith-chat-avatar"></div>
+                    <div class="lilith-chat-text">${lastComment}</div> 
+                </div>
             `;
         });
         
