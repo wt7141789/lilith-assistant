@@ -641,9 +641,13 @@ Language: Simplified Chinese (Mainland Internet Slang).`;
         },
 
         async triggerRealtimeComment(messageId) {
+            console.log('[Lilith] triggerRealtimeComment called for', messageId);
             const context = SillyTavern.getContext();
             const targetMsg = context.chat.find(m => m.mes_id == messageId);
-            if (!targetMsg) return;
+            if (!targetMsg) {
+                console.error('[Lilith] targetMsg not found in chat array!');
+                return;
+            }
 
             const chatLog = getPageContext(5).map(m => `${m.name}: ${m.message}`).join('\n');
             const persona = PERSONA_DB[userState.activePersona] || PERSONA_DB['toxic'];
@@ -1288,41 +1292,53 @@ Instruction:
 
     // --- ST Extension Loader ---
     function init() {
+        console.log('[Lilith] Initializing Assistant Extension...');
         assistantManager.initStruct();
         
-        const { eventSource, event_types, updateChatMetadata, saveChat: stSaveChat, chat } = SillyTavern.getContext();
+        try {
+            const context = SillyTavern.getContext();
+            const { eventSource, event_types } = context;
 
-        // 1. 注册消息接收监听 (实时评论)
-        if (eventSource && event_types) {
-             eventSource.on(event_types.MESSAGE_RECEIVED, async (messageId) => {
-                 // 获取刚收到的消息
-                 const chatData = SillyTavern.getContext().chat;
-                 const msg = chatData.find(m => m.mes_id == messageId);
-                 
-                 // 只有 AI 的回复才触发吐槽 (或者根据需求，非莉莉丝本人发的消息)
-                 if (msg && !msg.is_user && !msg.is_system && !msg.mes.includes('[莉莉丝]')) {
-                     const freq = userState.commentFrequency || 0;
-                     if (Math.random() * 100 < freq) {
-                         console.log('[Lilith] Random interaction triggered.');
-                         assistantManager.triggerRealtimeComment(messageId);
-                     }
-                 }
-             });
+            if (eventSource && event_types) {
+                console.log('[Lilith] Event listeners registering...');
 
-             // 2. 注册发送前过滤 (不发送吐槽内容给 AI)
-             eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (data) => {
-                 console.log('[Lilith] Prompt filtering active.');
-                 // 这里的 data.chat 是发送给 AI 的聊天记录副本
-                 if (data && data.chat) {
-                     data.chat.forEach(msg => {
-                         if (msg.mes) {
-                             // 移除 [莉莉丝] 开头的块，直到换行或结束
-                             // 这样 AI 就看不见莉莉丝插入在正文里的吐槽了
-                             msg.mes = msg.mes.replace(/\[莉莉丝\][\s\S]*?(?=\n\n|$)/g, '').trim();
-                         }
-                     });
-                 }
-             });
+                // 1. 注册消息接收监听 (实时评论)
+                eventSource.on(event_types.MESSAGE_RECEIVED, async (messageId) => {
+                    const chatData = SillyTavern.getContext().chat;
+                    const msg = chatData.find(m => m.mes_id == messageId);
+                    
+                    console.log(`[Lilith] MESSAGE_RECEIVED: ${messageId}`, msg ? 'Found' : 'Not Found');
+                    
+                    if (msg && !msg.is_user && !msg.is_system && !msg.mes.includes('[莉莉丝]')) {
+                        const freq = userState.commentFrequency || 0;
+                        const dice = Math.random() * 100;
+                        console.log(`[Lilith] Dice: ${dice.toFixed(2)} / Threshold: ${freq}`);
+                        
+                        if (dice < freq) {
+                            console.log('[Lilith] Interaction triggered!');
+                            assistantManager.triggerRealtimeComment(messageId);
+                        }
+                    }
+                });
+
+                // 2. 注册发送前过滤 (不发送吐槽内容给 AI)
+                eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (data) => {
+                    if (data && data.chat) {
+                        let count = 0;
+                        data.chat.forEach(msg => {
+                            if (msg.mes && msg.mes.includes('[莉莉丝]')) {
+                                msg.mes = msg.mes.replace(/\[莉莉丝\][\s\S]*?(?=\n\n|$)/g, '').trim();
+                                count++;
+                            }
+                        });
+                        if (count > 0) console.log(`[Lilith] Filtered ${count} comments from prompt.`);
+                    }
+                });
+            } else {
+                console.warn('[Lilith] eventSource or event_types not found in context!');
+            }
+        } catch (e) {
+            console.error('[Lilith] Failed to setup event listeners:', e);
         }
 
         // 注册消息渲染钩子
