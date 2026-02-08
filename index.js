@@ -320,19 +320,60 @@
         },
 
         // --- 🔴 立绘数据库：五重人格完整版 ---
-        // 支持内置存储 (相对路径，如 "assets/xxx.png") 或 网络图片 (http/https)
+        // 已配置为优先使用本地内置存储 (assets/ 文件夹)
         avatarPacks: {
             'meme': {
-                normal:     'https://i.postimg.cc/YSHhNdJT/IMG_20260130_143415.png',
-                high:       'https://i.postimg.cc/MZ4NrNdD/1769753973090.png',
-                love:       'https://i.postimg.cc/MZ4NrNdD/1769753973090.png',
-                angry:      'https://i.postimg.cc/7LwZJfzZ/IMG_20260130_143329.png',
-                speechless: 'https://i.postimg.cc/KYx83RTb/IMG_20260130_143343.png',
-                mockery:    'https://i.postimg.cc/JhMzHGXC/IMG_20260130_143355.png',
-                horny:      'https://i.postimg.cc/Df9JyfxZ/IMG_20260130_143242.png',
-                happy:      'https://i.postimg.cc/J7DHLH5r/IMG_20260130_143304.png',
-                disgust:    'https://i.postimg.cc/1RnVQVry/IMG_20260130_143313.png'
+                normal:     'assets/meme_normal.png',
+                high:       'assets/meme_high.png',
+                love:       'assets/meme_high.png',
+                angry:      'assets/meme_angry.png',
+                speechless: 'assets/meme_speechless.png',
+                mockery:    'assets/meme_mockery.png',
+                horny:      'assets/meme_horny.png',
+                happy:      'assets/meme_happy.png',
+                disgust:    'assets/meme_disgust.png'
             },
+            'toxic': {
+                normal:     'assets/toxic_normal.png',
+                love:       'assets/toxic_happy.png',
+                angry:      'assets/toxic_angry.png',
+                speechless: 'assets/toxic_speechless.png',
+                mockery:    'assets/toxic_mockery.png',
+                horny:      'assets/toxic_horny.png',
+                happy:      'assets/toxic_happy.png',
+                disgust:    'assets/toxic_disgust.png'
+            },
+            'wife': {
+                normal:     'assets/wife_normal.png',
+                love:       'assets/wife_love.png',
+                angry:      'assets/wife_angry.png',
+                speechless: 'assets/wife_speechless.png',
+                mockery:    'assets/wife_horny.png',
+                horny:      'assets/wife_horny.png',
+                happy:      'assets/wife_happy.png',
+                disgust:    'assets/wife_disgust.png'
+            },
+            'brat': {
+                normal:     'assets/brat_normal.png',
+                love:       'assets/brat_horny.png',
+                angry:      'assets/brat_angry.png',
+                speechless: 'assets/brat_speechless.png',
+                mockery:    'assets/brat_love.png',
+                horny:      'assets/brat_horny.png',
+                happy:      'assets/brat_happy.png',
+                disgust:    'assets/brat_disgust.png'
+            },
+            'imouto': {
+                normal:     'assets/imouto_normal.png',
+                love:       'assets/imouto_horny.png',
+                angry:      'assets/imouto_angry.png',
+                speechless: 'assets/imouto_speechless.png',
+                mockery:    'assets/imouto_mockery.png',
+                horny:      'assets/imouto_horny.png',
+                happy:      'assets/imouto_happy.png',
+                disgust:    'assets/imouto_disgust.png'
+            }
+        },
             'toxic': {
                 normal:     'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/normal.png',
                 love:       'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/horny%EF%BC%88ooc%EF%BC%89.png',
