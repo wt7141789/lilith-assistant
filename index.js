@@ -409,30 +409,56 @@
         createDrawerButton(parentWin) {
             const insertBtn = () => {
                 // 尝试多个可能的 ID，兼容不同版本的酒馆
-                const drawer = document.getElementById('left-drawer') || 
-                               document.getElementById('side-bar') || 
-                               document.querySelector('.drawer-content');
-                               
+                // 1. #left-drawer (旧版/标准版)
+                // 2. #side-bar (某些魔改版)
+                // 3. #rm_extensions_block (扩展栏位置)
+                // 4. .drawer-content (通用类名)
+                // 5. #extensions_settings (设置面板内)
+                const targets = [
+                    document.getElementById('left-drawer'),
+                    document.getElementById('side-bar'),
+                    document.getElementById('rm_extensions_block'),
+                    document.querySelector('.drawer-content'),
+                    document.querySelector('#extensions_settings .inline-drawer-content')
+                ];
+                
+                const drawer = targets.find(t => t);
+                
                 if (drawer && !document.getElementById('lilith-drawer-btn')) {
+                    console.log('[Lilith] Found drawer container:', drawer.id || drawer.className);
+                    
                     const btn = document.createElement('div');
                     btn.id = 'lilith-drawer-btn';
-                    // 使用酒馆原生类名以获得更好样式：menu_button, clickable, drawer-item
-                    btn.className = 'menu_button clickable';
-                    btn.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px 15px; border-bottom:1px solid rgba(255,255,255,0.1); cursor:pointer; color:var(--l-main); font-weight:bold; transition: 0.2s;';
+                    // 使用酒馆原生类名
+                    btn.className = 'menu_button clickable drawer-item';
+                    
+                    // 强制样式，防止被覆盖
+                    btn.style.cssText = 'display:flex !important; align-items:center; gap:10px; padding:10px 15px; border-bottom:1px solid rgba(255,255,255,0.1); cursor:pointer; color:#ff0055; font-weight:bold; transition: 0.2s; background: rgba(0,0,0,0.2); margin-bottom: 5px; border-radius: 5px;';
                     btn.innerHTML = '<span style="font-size:18px;">😈</span><span style="font-size:14px;">莉莉丝助手</span>';
                     
-                    btn.onmouseenter = () => btn.style.background = 'rgba(255,255,255,0.1)';
-                    btn.onmouseleave = () => btn.style.background = 'none';
+                    btn.onmouseenter = () => btn.style.background = 'rgba(255,0,85,0.15)';
+                    btn.onmouseleave = () => btn.style.background = 'rgba(0,0,0,0.2)';
+                    
                     btn.onclick = (e) => {
                         e.stopPropagation();
+                        e.preventDefault();
+                        console.log('[Lilith] Drawer button clicked.');
                         this.togglePanel(parentWin);
-                        // 如果在移动端，点击后自动收起抽屉
-                        const closeBtn = document.getElementById('left-drawer-close');
-                        if (closeBtn && window.innerWidth < 800) closeBtn.click();
+                        
+                        // 移动端自动收起
+                        if (window.innerWidth < 800) {
+                            const closeBtn = document.getElementById('left-drawer-close') || document.querySelector('.drawer-close');
+                            if (closeBtn) closeBtn.click();
+                        }
                     };
                     
-                    // 插入到最顶部
-                    drawer.prepend(btn);
+                    // 如果是列表容器，插到最前；如果是扩展块，插在该块之前或者内部
+                    if (drawer.id === 'rm_extensions_block') {
+                         drawer.parentElement.insertBefore(btn, drawer);
+                    } else {
+                         drawer.prepend(btn);
+                    }
+                    
                     console.log('[Lilith] Drawer button injected successfully.');
                     return true;
                 }
@@ -441,11 +467,14 @@
 
             // 初始尝试
             if (!insertBtn()) {
-                // 如果没找到，每秒检查一次，最多持续10秒（应对延迟加载）
+                console.log('[Lilith] Drawer not found immediately, starting poller...');
                 let attempts = 0;
                 const interval = setInterval(() => {
                     attempts++;
-                    if (insertBtn() || attempts > 10) {
+                    if (insertBtn()) {
+                        clearInterval(interval);
+                    } else if (attempts > 20) { // 增加尝试次数到20次 (20秒)
+                        console.warn('[Lilith] Failed to inject drawer button after 20s. UI might be incompatible.');
                         clearInterval(interval);
                     }
                 }, 1000);
