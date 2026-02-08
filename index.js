@@ -801,11 +801,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             
             const wrapper = document.createElement('div'); wrapper.id = containerId; wrapper.style.left = '100px'; wrapper.style.top = '100px';
             
-            // 创建头像容器供气泡定位
-            const avatarBox = document.createElement('div'); avatarBox.id = 'lilith-avatar-box';
-            
             const avatar = document.createElement('div'); avatar.id = avatarId;
-            avatarBox.appendChild(avatar);
             
             const panel = document.createElement('div'); panel.id = panelId; panel.style.display = 'none';
             ['mousedown', 'touchstart', 'click'].forEach(evt => panel.addEventListener(evt, e => e.stopPropagation()));
@@ -928,7 +924,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     </div>
                 </div>
             `;
-            wrapper.appendChild(avatarBox); wrapper.appendChild(panel); document.body.appendChild(wrapper);
+            wrapper.appendChild(avatar); wrapper.appendChild(panel); document.body.appendChild(wrapper);
             this.bindDrag(parentWin, wrapper, avatar, panel); this.bindPanelEvents(parentWin); this.startHeartbeat(parentWin); this.restoreChatHistory(parentWin); this.renderMemoryUI(parentWin);
             
             this.setAvatar(parentWin);
@@ -1128,7 +1124,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             b.innerHTML = `<span style="color:var(--l-cyan)">[莉莉丝]</span> ${msg.length > 200 ? msg.substring(0, 198) + "..." : msg}`;
             if (userState.sanity < 30) b.style.borderColor = '#ff0000';
             b.onclick = () => b.remove(); 
-            document.getElementById('lilith-avatar-box').appendChild(b);
+            document.getElementById(containerId).appendChild(b);
             setTimeout(() => { if(b.parentNode) b.remove(); }, 8000);
         },
 

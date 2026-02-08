@@ -97,7 +97,7 @@ div.lilith-chat-text {
     position: absolute; 
     top: 10px; 
     left: 90px;
-    width: 200px; 
+    width: 180px; 
     background: rgba(0,0,0,0.95); 
     border: 1px solid var(--l-main);
     border-left: 4px solid var(--l-main);
@@ -353,7 +353,8 @@ div.lilith-chat-text {
     cursor: pointer;
 }
 
-/* 气泡 */
+/* 气泡样式已在上合并，此处移除重复定义 */
+/*
 #lilith-bubble-cn {
     position: absolute;
     bottom: 110px;
@@ -370,6 +371,7 @@ div.lilith-chat-text {
     z-index: 10002;
     animation: bubble-in 0.3s ease-out;
 }
+*/
 
 @keyframes bubble-in {
     from { opacity: 0; transform: translateY(10px); }
