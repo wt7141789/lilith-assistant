@@ -712,54 +712,11 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     const targetMsgRef = chatData[finalIndex];
                     if (!targetMsgRef) throw new Error("Could not find targets message in chat array");
 
-                    // 2. 更新内存数据 - 根据模式选择插入位置
+                    // 2. 更新内存数据 - 始终追加在末尾 (移除卡顿的随机插入逻辑)
                     const cleanComment = comment.trim();
                     const msgText = targetMsgRef.mes;
 
-                    // 安全检测：如果正文包含列表、表格、代码块，随机插入极易破坏结构
-                    const isComplex = /^\s*([*+\-]|(\d+\.))\s/m.test(msgText) || // 列表
-                                     msgText.includes('|') || // 表格
-                                     msgText.includes('```'); // 代码块
-
-                    if (userState.commentMode === 'random' && !isComplex) {
-                        let delimiter = '\n\n';
-                        let parts = msgText.split(delimiter).filter(p => p.trim());
-
-                        // 1. 降级策略 A：尝试单换行
-                        if (parts.length < 2) {
-                             const singleParts = msgText.split('\n').filter(p => p.trim());
-                             if (singleParts.length >= 3) {
-                                 delimiter = '\n';
-                                 parts = singleParts;
-                             }
-                        }
-
-                        // 2. 降级策略 B：尝试按中英文标点断句 (。！？!?)
-                        if (parts.length < 2) {
-                            // 匹配标点及其后的空白
-                            const sentenceRegex = /([。！？!?;])\s*/g;
-                            const rawParts = msgText.split(sentenceRegex);
-                            
-                            let combined = [];
-                            for (let i = 0; i < rawParts.length; i += 2) {
-                                let s = (rawParts[i] || "") + (rawParts[i+1] || "");
-                                if (s.trim()) combined.push(s);
-                            }
-                            
-                            if (combined.length >= 3) {
-                                delimiter = ''; // 标点已保留，不需要额外连接符
-                                parts = combined;
-                            }
-                        }
-
-                        if (parts.length >= 2) {
-                            const insertIndex = Math.floor(Math.random() * (parts.length - 1)) + 1;
-                            parts.splice(insertIndex, 0, cleanComment);
-                            targetMsgRef.mes = parts.join(delimiter);
-                        } else {
-                            targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
-                        }
-                    } else if (userState.commentMode === 'top') {
+                    if (userState.commentMode === 'top') {
                         targetMsgRef.mes = `${cleanComment}\n\n` + msgText.trim();
                     } else {
                         // 始终追加在末尾
@@ -769,39 +726,36 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     // 3. 触发渲染与数据同步
                     console.log('[Lilith] Updating message block for index:', finalIndex);
 
-                    // 重新启用自动刷新机制 (用户需求: 吐槽后自动刷新酒馆)
+                    // 同步到 UI (使用轻量级更新，避免全量刷新导致的语音卡顿)
                     setTimeout(async () => {
                          try {
                             const ctx = SillyTavern.getContext();
 
-                            // 1. 尝试保存最新的聊天数据到磁盘
+                            // 1. 保存数据
                             if (ctx.saveChat) {
                                 await ctx.saveChat();
                             } else if (typeof saveChat === 'function') {
                                 await saveChat();
                             }
 
-                            // 2. 刷新当前聊天视图 (Reload Current Chat)
-                            if (ctx.reloadCurrentChat) {
-                                console.log('[Lilith] Reloading current chat via Context API...');
-                                await ctx.reloadCurrentChat();
-                            } else if (typeof reloadCurrentChat === 'function') {
-                                console.log('[Lilith] Reloading current chat via Global API...');
-                                await reloadCurrentChat();
-                            } else if (typeof viewAllMessages === 'function') {
-                                viewAllMessages();
+                            // 2. 局部刷新消息块 (代替 Reload Current Chat)
+                            if (ctx.updateMessageBlock) {
+                                ctx.updateMessageBlock(finalIndex);
+                            } else if (typeof updateMessageBlock === 'function') {
+                                updateMessageBlock(finalIndex);
                             } else {
-                                console.warn('[Lilith] No refresh function found. UI might be desynced until manual refresh.');
+                                // 备选：如果找不到局部更新函数，再尝试刷新视图
+                                if (ctx.reloadCurrentChat) await ctx.reloadCurrentChat();
                             }
 
                             // 3. 吐槽播报
                             AudioSys.speak(cleanComment.replace(/\[莉莉丝\]/g, '').trim());
 
-                            console.log('[Lilith] Comment injected and refreshed for message', messageId);
+                            console.log('[Lilith] Comment injected via partial update:', messageId);
                          } catch (e) {
-                             console.error('[Lilith] Auto-refresh failed:', e);
+                             console.error('[Lilith] Update failed:', e);
                          }
-                    }, 500); // 500ms 延迟，确保数据写入完成
+                    }, 200); 
                 }
             } catch (e) {
                 console.error('[Lilith] Failed to trigger comment:', e);
@@ -893,8 +847,8 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                             <div style="margin-top:8px;">
                                 <label style="font-size:12px; color:#ccc;">插入模式:</label>
                                 <select id="cfg-comment-mode" style="background:#111; color:#fff; border:1px solid #444; font-size:12px; height:24px;">
-                                    <option value="random" ${userState.commentMode === 'random' ? 'selected' : ''}>🎲 随机插入正文 (断句处)</option>
                                     <option value="bottom" ${userState.commentMode === 'bottom' ? 'selected' : ''}>⬇️ 始终追加在末尾</option>
+                                    <option value="top" ${userState.commentMode === 'top' ? 'selected' : ''}>⬆️ 始终插入到顶端</option>
                                 </select>
                             </div>
                          </div>
