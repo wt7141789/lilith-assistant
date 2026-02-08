@@ -2,6 +2,7 @@
     'use strict';
 
     // --- 1. 基础常量 ---
+    const extensionName = 'lilith-assistant';
     const containerId = 'lilith-wrapper-cn';
     const avatarId = 'lilith-avatar-cn';
     const panelId = 'lilith-panel-cn';
@@ -306,58 +307,64 @@
             model: 'gemini-1.5-flash'
         },
 
-        // --- 🔴 立绘数据库：五重人格完整版 ---
+        // --- 🔴 立绘数据库：使用本地 assets 资源 ---
+        // 插件路径接口：
+        extensionPath: `/scripts/extensions/third-party/${extensionName}`,
+        getAssetUrl(persona, emotion) {
+            return `${this.extensionPath}/assets/${persona}_${emotion}.png`;
+        },
+
         avatarPacks: {
             'meme': {
-                normal:     'https://i.postimg.cc/YSHhNdJT/IMG_20260130_143415.png',
-                high:       'https://i.postimg.cc/MZ4NrNdD/1769753973090.png',
-                love:       'https://i.postimg.cc/MZ4NrNdD/1769753973090.png',
-                angry:      'https://i.postimg.cc/7LwZJfzZ/IMG_20260130_143329.png',
-                speechless: 'https://i.postimg.cc/KYx83RTb/IMG_20260130_143343.png',
-                mockery:    'https://i.postimg.cc/JhMzHGXC/IMG_20260130_143355.png',
-                horny:      'https://i.postimg.cc/Df9JyfxZ/IMG_20260130_143242.png',
-                happy:      'https://i.postimg.cc/J7DHLH5r/IMG_20260130_143304.png',
-                disgust:    'https://i.postimg.cc/1RnVQVry/IMG_20260130_143313.png'
+                normal:     `/scripts/extensions/third-party/${extensionName}/assets/meme_normal.png`,
+                high:       `/scripts/extensions/third-party/${extensionName}/assets/meme_high.png`,
+                love:       `/scripts/extensions/third-party/${extensionName}/assets/meme_high.png`, // meme 没有单独 love，复用 high
+                angry:      `/scripts/extensions/third-party/${extensionName}/assets/meme_angry.png`,
+                speechless: `/scripts/extensions/third-party/${extensionName}/assets/meme_speechless.png`,
+                mockery:    `/scripts/extensions/third-party/${extensionName}/assets/meme_mockery.png`,
+                horny:      `/scripts/extensions/third-party/${extensionName}/assets/meme_horny.png`,
+                happy:      `/scripts/extensions/third-party/${extensionName}/assets/meme_happy.png`,
+                disgust:    `/scripts/extensions/third-party/${extensionName}/assets/meme_disgust.png`
             },
             'toxic': {
-                normal:     'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/normal.png',
-                love:       'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/horny%EF%BC%88ooc%EF%BC%89.png',
-                angry:      'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/angry.png',
-                speechless: 'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/speechless.png',
-                mockery:    'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/disgust.png',
-                horny:      'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/high.png',
-                happy:      'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/love1.png',
-                disgust:    'https://raw.githubusercontent.com/481784983-lang/lilisith/fedda564e6ec15493e4cf34449dfa85cecb065aa/love-%E8%BF%99%E5%B0%B1%E6%98%AF%E7%88%B1.png'
+                normal:     `/scripts/extensions/third-party/${extensionName}/assets/toxic_normal.png`,
+                love:       `/scripts/extensions/third-party/${extensionName}/assets/toxic_love.png`,
+                angry:      `/scripts/extensions/third-party/${extensionName}/assets/toxic_angry.png`,
+                speechless: `/scripts/extensions/third-party/${extensionName}/assets/toxic_speechless.png`,
+                mockery:    `/scripts/extensions/third-party/${extensionName}/assets/toxic_mockery.png`,
+                horny:      `/scripts/extensions/third-party/${extensionName}/assets/toxic_horny.png`,
+                happy:      `/scripts/extensions/third-party/${extensionName}/assets/toxic_happy.png`,
+                disgust:    `/scripts/extensions/third-party/${extensionName}/assets/toxic_disgust.png`
             },
             'wife': {
-                normal:     'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/normal4.png',
-                love:       'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/love.png',
-                angry:      'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/angry.png',
-                speechless: 'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/disgust.png',
-                mockery:    'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/honry.png',
-                horny:      'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/high.png',
-                happy:      'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/happy.png',
-                disgust:    'https://raw.githubusercontent.com/481784983-lang/lilisith/627e96e8ebacbd35ccf04f4b1af258953b3b4ff3/mockery.png'
+                normal:     `/scripts/extensions/third-party/${extensionName}/assets/wife_normal.png`,
+                love:       `/scripts/extensions/third-party/${extensionName}/assets/wife_love.png`,
+                angry:      `/scripts/extensions/third-party/${extensionName}/assets/wife_angry.png`,
+                speechless: `/scripts/extensions/third-party/${extensionName}/assets/wife_speechless.png`,
+                mockery:    `/scripts/extensions/third-party/${extensionName}/assets/wife_mockery.png`,
+                horny:      `/scripts/extensions/third-party/${extensionName}/assets/wife_horny.png`,
+                happy:      `/scripts/extensions/third-party/${extensionName}/assets/wife_happy.png`,
+                disgust:    `/scripts/extensions/third-party/${extensionName}/assets/wife_disgust.png`
             },
             'brat': {
-                normal:     'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/mockery.png',
-                love:       'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/horny.png',
-                angry:      'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/angry-%E6%9D%82%E9%B1%BC.png',
-                speechless: 'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/speechless.png',
-                mockery:    'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/love.png',
-                horny:      'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/high.png',
-                happy:      'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/happy.png',
-                disgust:    'https://raw.githubusercontent.com/481784983-lang/lilisith/e728dbf76338103e9115116e17089ff82b7aa057/disgust.png'
+                normal:     `/scripts/extensions/third-party/${extensionName}/assets/brat_normal.png`,
+                love:       `/scripts/extensions/third-party/${extensionName}/assets/brat_love.png`,
+                angry:      `/scripts/extensions/third-party/${extensionName}/assets/brat_angry.png`,
+                speechless: `/scripts/extensions/third-party/${extensionName}/assets/brat_speechless.png`,
+                mockery:    `/scripts/extensions/third-party/${extensionName}/assets/brat_mockery.png`,
+                horny:      `/scripts/extensions/third-party/${extensionName}/assets/brat_horny.png`,
+                happy:      `/scripts/extensions/third-party/${extensionName}/assets/brat_happy.png`,
+                disgust:    `/scripts/extensions/third-party/${extensionName}/assets/brat_disgust.png`
             },
             'imouto': {
-                normal:     'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/normal1.png',
-                love:       'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/horny.png',
-                angry:      'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/mockery-%E7%9C%8B%E6%9D%82%E7%A2%8E%E7%9A%84%E7%9C%BC%E7%A5%9E.png',
-                speechless: 'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/love%EF%BC%9F.png',
-                mockery:    'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/inlove.png',
-                horny:      'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/high.png',
-                happy:      'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/happy.png',
-                disgust:    'https://raw.githubusercontent.com/481784983-lang/lilisith/8abf69fc6bdf1f8a96ac32a6b5067389e85455f5/disgust.png'
+                normal:     `/scripts/extensions/third-party/${extensionName}/assets/imouto_normal.png`,
+                love:       `/scripts/extensions/third-party/${extensionName}/assets/imouto_love.png`,
+                angry:      `/scripts/extensions/third-party/${extensionName}/assets/imouto_angry.png`,
+                speechless: `/scripts/extensions/third-party/${extensionName}/assets/imouto_speechless.png`,
+                mockery:    `/scripts/extensions/third-party/${extensionName}/assets/imouto_mockery.png`,
+                horny:      `/scripts/extensions/third-party/${extensionName}/assets/imouto_horny.png`,
+                happy:      `/scripts/extensions/third-party/${extensionName}/assets/imouto_happy.png`,
+                disgust:    `/scripts/extensions/third-party/${extensionName}/assets/imouto_disgust.png`
             }
         },
 
@@ -712,26 +719,51 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     const targetMsgRef = chatData[finalIndex];
                     if (!targetMsgRef) throw new Error("Could not find targets message in chat array");
 
-                    // 2. 更新内存数据
+                    // 2. 更新内存数据 - 根据模式选择插入位置
                     const cleanComment = comment.trim();
                     const msgText = targetMsgRef.mes;
 
-                    if (userState.commentMode === 'random') {
-                        // 随机插入逻辑：寻找正文中的标点符号断句处
-                        const splitters = /([。！？\.\!\?]+)/g;
-                        const parts = msgText.trim().split(splitters);
-                        
-                        if (parts.length > 2) {
-                            // 随机选择一个断句点 (偶数索引是文字，奇数索引是标点)
-                            // 我们在标点后面插入换行和吐槽
-                            const pairCount = Math.floor(parts.length / 2);
-                            const randomPairIndex = Math.floor(Math.random() * pairCount);
-                            const splitIndex = randomPairIndex * 2 + 1;
+                    // 安全检测：如果正文包含列表、表格、代码块，随机插入极易破坏结构
+                    const isComplex = /^\s*([*+\-]|(\d+\.))\s/m.test(msgText) || // 列表
+                                     msgText.includes('|') || // 表格
+                                     msgText.includes('```'); // 代码块
+
+                    if (userState.commentMode === 'random' && !isComplex) {
+                        let delimiter = '\n\n';
+                        let parts = msgText.split(delimiter).filter(p => p.trim());
+
+                        // 1. 降级策略 A：尝试单换行
+                        if (parts.length < 2) {
+                             const singleParts = msgText.split('\n').filter(p => p.trim());
+                             if (singleParts.length >= 3) {
+                                 delimiter = '\n';
+                                 parts = singleParts;
+                             }
+                        }
+
+                        // 2. 降级策略 B：尝试按中英文标点断句 (。！？!?)
+                        if (parts.length < 2) {
+                            // 匹配标点及其后的空白
+                            const sentenceRegex = /([。！？!?;])\s*/g;
+                            const rawParts = msgText.split(sentenceRegex);
                             
-                            parts[splitIndex] += `\n\n${cleanComment}\n\n`;
-                            targetMsgRef.mes = parts.join('');
+                            let combined = [];
+                            for (let i = 0; i < rawParts.length; i += 2) {
+                                let s = (rawParts[i] || "") + (rawParts[i+1] || "");
+                                if (s.trim()) combined.push(s);
+                            }
+                            
+                            if (combined.length >= 3) {
+                                delimiter = ''; // 标点已保留，不需要额外连接符
+                                parts = combined;
+                            }
+                        }
+
+                        if (parts.length >= 2) {
+                            const insertIndex = Math.floor(Math.random() * (parts.length - 1)) + 1;
+                            parts.splice(insertIndex, 0, cleanComment);
+                            targetMsgRef.mes = parts.join(delimiter);
                         } else {
-                            // 只有一句话，追加在末尾
                             targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
                         }
                     } else if (userState.commentMode === 'top') {
@@ -744,36 +776,39 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     // 3. 触发渲染与数据同步
                     console.log('[Lilith] Updating message block for index:', finalIndex);
 
-                    // 同步到 UI (使用轻量级更新，避免全量刷新导致的语音卡顿)
+                    // 重新启用自动刷新机制 (用户需求: 吐槽后自动刷新酒馆)
                     setTimeout(async () => {
                          try {
                             const ctx = SillyTavern.getContext();
 
-                            // 1. 保存数据
+                            // 1. 尝试保存最新的聊天数据到磁盘
                             if (ctx.saveChat) {
                                 await ctx.saveChat();
                             } else if (typeof saveChat === 'function') {
                                 await saveChat();
                             }
 
-                            // 2. 局部刷新消息块 (代替 Reload Current Chat)
-                            if (ctx.updateMessageBlock) {
-                                ctx.updateMessageBlock(finalIndex);
-                            } else if (typeof updateMessageBlock === 'function') {
-                                updateMessageBlock(finalIndex);
+                            // 2. 刷新当前聊天视图 (Reload Current Chat)
+                            if (ctx.reloadCurrentChat) {
+                                console.log('[Lilith] Reloading current chat via Context API...');
+                                await ctx.reloadCurrentChat();
+                            } else if (typeof reloadCurrentChat === 'function') {
+                                console.log('[Lilith] Reloading current chat via Global API...');
+                                await reloadCurrentChat();
+                            } else if (typeof viewAllMessages === 'function') {
+                                viewAllMessages();
                             } else {
-                                // 备选：如果找不到局部更新函数，再尝试刷新视图
-                                if (ctx.reloadCurrentChat) await ctx.reloadCurrentChat();
+                                console.warn('[Lilith] No refresh function found. UI might be desynced until manual refresh.');
                             }
 
                             // 3. 吐槽播报
                             AudioSys.speak(cleanComment.replace(/\[莉莉丝\]/g, '').trim());
 
-                            console.log('[Lilith] Comment injected via partial update:', messageId);
+                            console.log('[Lilith] Comment injected and refreshed for message', messageId);
                          } catch (e) {
-                             console.error('[Lilith] Update failed:', e);
+                             console.error('[Lilith] Auto-refresh failed:', e);
                          }
-                    }, 200); 
+                    }, 500); // 500ms 延迟，确保数据写入完成
                 }
             } catch (e) {
                 console.error('[Lilith] Failed to trigger comment:', e);
@@ -865,9 +900,8 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                             <div style="margin-top:8px;">
                                 <label style="font-size:12px; color:#ccc;">插入模式:</label>
                                 <select id="cfg-comment-mode" style="background:#111; color:#fff; border:1px solid #444; font-size:12px; height:24px;">
+                                    <option value="random" ${userState.commentMode === 'random' ? 'selected' : ''}>🎲 随机插入正文 (断句处)</option>
                                     <option value="bottom" ${userState.commentMode === 'bottom' ? 'selected' : ''}>⬇️ 始终追加在末尾</option>
-                                    <option value="random" ${userState.commentMode === 'random' ? 'selected' : ''}>🎲 随机文本内插入</option>
-                                    <option value="top" ${userState.commentMode === 'top' ? 'selected' : ''}>⬆️ 始终插入到顶端</option>
                                 </select>
                             </div>
                          </div>
@@ -1291,12 +1325,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 commentModeSelect.addEventListener('change', () => {
                     userState.commentMode = commentModeSelect.value;
                     saveState();
-                    const modeMap = {
-                        'bottom': '末尾追加',
-                        'random': '随机文本插入',
-                        'top': '顶端置顶'
-                    };
-                    this.showBubble(parentWin, `插入模式已更新: ${modeMap[userState.commentMode] || userState.commentMode}`);
+                    this.showBubble(parentWin, `模式已切换: ${userState.commentMode === 'random' ? '随机正文插入' : '末尾追加'}`);
                 });
             }
 
@@ -1445,7 +1474,7 @@ The user just received a reply. Your job is to interject with a short, sharp, an
 
     async function initUI() {
         try {
-            const htmlPath = `/scripts/extensions/third-party/lilith-assistant/settings.html`;
+            const htmlPath = `/scripts/extensions/third-party/${extensionName}/settings.html`;
             const settingsHtml = await $.get(htmlPath);
             $('#extensions_settings').append(settingsHtml);
 
