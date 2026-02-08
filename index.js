@@ -1547,32 +1547,51 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 const config = SillyTavern.getContext();
                 const regexName = "[Lilith] 专属 UI 注入";
                 
-                // 尝试多种路径获取正则列表，SillyTavern 版本不同路径可能不同
                 let regexList = null;
-                if (config.settings && Array.isArray(config.settings.regex)) regexList = config.settings.regex;
-                else if (config.settings && Array.isArray(config.settings.regex_scripts)) regexList = config.settings.regex_scripts;
-                else if (typeof window !== 'undefined' && window.settings && Array.isArray(window.settings.regex)) regexList = window.settings.regex;
-                else if (typeof window !== 'undefined' && window.settings && Array.isArray(window.settings.regex_scripts)) regexList = window.settings.regex_scripts;
-                else if (typeof window !== 'undefined' && Array.isArray(window.regex)) regexList = window.regex;
+                let useAPI = false;
+
+                // 1. 尝试使用 TavernHelper/Context API (推荐)
+                if (typeof config.getTavernRegexes === 'function') {
+                    regexList = config.getTavernRegexes();
+                    if (Array.isArray(regexList)) useAPI = true;
+                }
+                
+                // 2. 尝试多种路径获取正则列表
+                if (!regexList) {
+                    const possiblePaths = [
+                        config.settings?.regex,
+                        config.settings?.regex_scripts,
+                        (typeof window !== 'undefined' && window.settings) ? window.settings.regex : null,
+                        (typeof window !== 'undefined' && window.settings) ? window.settings.regex_scripts : null,
+                        config.extensionSettings?.regex,
+                        (typeof window !== 'undefined' ? window.extension_settings?.regex : null),
+                        (typeof window !== 'undefined' ? window.regex_scripts : null)
+                    ];
+                    for (const path of possiblePaths) {
+                        if (Array.isArray(path)) {
+                            regexList = path;
+                            break;
+                        }
+                    }
+                }
                 
                 if (!regexList) {
                     // 打印详细信息锁定问题路径
-                    console.log('[Lilith] Regex list not found. ConfigSettings:', !!config.settings, 'WindowSettings:', !!(typeof window !== 'undefined' && window.settings), 'Will retry...');
+                    console.log('[Lilith] Regex list not found. Context API:', useAPI, 'ConfigSettings:', !!config.settings, 'WindowSettings:', !!(typeof window !== 'undefined' && window.settings), 'ExtensionSettings:', !!config.extensionSettings);
+                    console.log('[Lilith] Available Context Keys:', Object.keys(config).slice(0, 20).join(', '));
                     setTimeout(ensureGlobalRegex, 3000);
                     return;
                 }
                 
                 let existing = regexList.find(r => r.scriptName === regexName);
                 const regexTemplate = {
-                    id: "lilith-ui-injector-v2", // 唯一标识符
+                    id: "lilith-ui-injector-v2", 
                     scriptName: regexName,
-                    // 优化正则：匹配 [莉莉丝] 到每行末尾 (美化版)
                     findRegex: "(\\[莉莉丝\\])\\s*([^\\n]*)",
-                    // 使用 SPAN 结构以匹配 Style.css 中的样式定义，并支持内联渲染
                     replaceString: `\n<span class="lilith-chat-ui-wrapper">\n    <span class="lilith-chat-ui">\n        <span class="lilith-chat-avatar"></span>\n        <span class="lilith-chat-text">$2</span>\n    </span>\n</span>\n`,
                     trimStrings: [],
-                    placement: [2], // 1=Before, 2=After, 3=Both
-                    disabled: false, // 持续确保开启
+                    placement: [2],
+                    disabled: false, 
                     markdownOnly: true,
                     promptOnly: false,
                     runOnEdit: true,
@@ -1581,16 +1600,24 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     maxDepth: 2
                 };
 
+                const finalize = () => {
+                    if (useAPI && typeof config.replaceTavernRegexes === 'function') {
+                        config.replaceTavernRegexes(regexList);
+                    } else if (config.saveSettingsDebounced) {
+                        config.saveSettingsDebounced();
+                    }
+                    console.log('[Lilith] Global Regex sync complete.');
+                };
+
                 if (!existing) {
-                    console.log('[Lilith] Global Regex not found, injecting and enabling...');
+                    console.log('[Lilith] Global Regex not found, injecting...');
                     regexList.push(regexTemplate);
-                    if (config.saveSettingsDebounced) config.saveSettingsDebounced();
+                    finalize();
                 } else {
-                    // 强制开启并更新内容
-                    console.log('[Lilith] Global Regex found, ensuring content is up to date and ENABLED...');
+                    console.log('[Lilith] Global Regex found, updating and enabling...');
                     Object.assign(existing, regexTemplate);
                     existing.disabled = false;
-                    if (config.saveSettingsDebounced) config.saveSettingsDebounced();
+                    finalize();
                 }
             } catch (e) {
                 console.error('[Lilith] Failed to inject global regex:', e);
