@@ -722,33 +722,47 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     }
                     
                     // 3. 触发渲染
-                    console.log('[Lilith] Updating message block at index:', finalIndex);
+                    console.log('[Lilith] Updating message block for index:', finalIndex);
                     try {
-                        // SillyTavern 的 updateMessageBlock 期望的是数组下标
+                        // 尝试使用官方接口刷新
                         if (typeof currentContext.updateMessageBlock === 'function') {
                             currentContext.updateMessageBlock(finalIndex);
                         } else if (typeof currentContext.printMessages === 'function') {
-                            currentContext.printMessages();
+                            viewAllMessages(); // 另外一个全量刷新的 API
                         }
                     } catch (err) {
-                        console.warn('[Lilith] UI Update failed, forcing printMessages', err);
-                        if (currentContext.printMessages) currentContext.printMessages();
+                        console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch.', err);
                     }
 
-                    // 4. 暴力 DOM 补丁 (双重保险)
+                    // 4. 彻底暴力 DOM 补丁 (全量扫描并应用)
+                    // 增加延迟确保酒馆自己的渲染已经完成，然后我们覆盖它
                     setTimeout(() => {
-                        const targetEl = $(`.mes[mes_id="${messageId}"] .mes_text`).last() || $(`.mes:last .mes_text`);
-                        if (targetEl.length && !targetEl.html().includes('lilith-chat-ui')) {
-                            console.log('[Lilith] Manual DOM Patching for message', messageId);
-                            const rendered = targetMsgRef.mes.replace(/\n/g, '<br>').replace(/\[莉莉丝\]\s*([^\n<]*)/g, `
-                                <div class="lilith-chat-ui">
-                                    <div class="lilith-chat-avatar"></div>
-                                    <div class="lilith-chat-text">$1</div>
-                                </div>
-                            `);
-                            targetEl.html(rendered);
-                        }
-                    }, 200);
+                        // 寻找对应消息 ID 的文本框，或者寻找包含 [莉莉丝] 且未被渲染的元素
+                        const $textElements = $(`.mes[mes_id="${messageId}"] .mes_text`).length ? 
+                                             $(`.mes[mes_id="${messageId}"] .mes_text`) : 
+                                             $(`.mes`).last().find('.mes_text');
+                        
+                        $textElements.each(function() {
+                            const $el = $(this);
+                            const rawText = targetMsgRef.mes;
+                            if (rawText.includes('[莉莉丝]') && !$el.find('.lilith-chat-ui').length) {
+                                console.log('[Lilith] Forcefully patching DOM for message:', messageId);
+                                // 模拟正则渲染逻辑
+                                const rendered = rawText.split('\n').map(line => {
+                                    if (line.includes('[莉莉丝]')) {
+                                        return line.replace(/\[莉莉丝\]\s*([^<]*)/g, `
+                                            <div class="lilith-chat-ui">
+                                                <div class="lilith-chat-avatar"></div>
+                                                <div class="lilith-chat-text">$1</div>
+                                            </div>
+                                        `);
+                                    }
+                                    return line;
+                                }).join('<br>');
+                                $el.html(rendered);
+                            }
+                        });
+                    }, 400);
 
                     const textToSpeak = comment.replace('[莉莉丝]', '').replace(/<[^>]*>/g, '').trim(); 
                     AudioSys.speak(textToSpeak);
@@ -1428,9 +1442,9 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                         if (dice < freq) {
                             console.log('[Lilith] Interaction triggered after generation!');
                             setTimeout(() => {
-                                // 传递 ID 或者 Index
+                                // 增加延时到 1000ms，避开 ST 渲染锁
                                 assistantManager.triggerRealtimeComment(messageId);
-                            }, 500);
+                            }, 1000);
                         }
                     }
                 });
