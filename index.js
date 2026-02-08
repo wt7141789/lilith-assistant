@@ -736,14 +736,18 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     // 3. 触发渲染
                     console.log('[Lilith] Updating message block for index:', finalIndex);
                     try {
-                        // 尝试使用官方接口刷新
-                        if (typeof currentContext.updateMessageBlock === 'function') {
-                            currentContext.updateMessageBlock(finalIndex);
-                        } else if (typeof currentContext.printMessages === 'function') {
-                            viewAllMessages(); // 另外一个全量刷新的 API
+                        // 获取最新的 context 以避免闭包导致的过期引用
+                        const freshContext = SillyTavern.getContext();
+                        const updateFn = freshContext.updateMessageBlock || (typeof updateMessageBlock === 'function' ? updateMessageBlock : null);
+                        
+                        // 严格边界检查
+                        if (typeof updateFn === 'function' && finalIndex >= 0 && finalIndex < freshContext.chat.length) {
+                            updateFn(finalIndex);
+                        } else if (typeof freshContext.printMessages === 'function') {
+                            freshContext.printMessages();
                         }
                     } catch (err) {
-                        console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch.', err);
+                        console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch fallback.', err);
                     }
 
                     // 4. 彻底暴力 DOM 补丁 (全量扫描并应用)
@@ -927,7 +931,8 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             
             this.setAvatar(parentWin);
             this.updateAvatarStyle(parentWin);
-            this.createDrawerButton(parentWin); 
+            // 移除旧版手动注入按钮逻辑，已整合进 settings.html
+            // this.createDrawerButton(parentWin); 
             
             updateUI();
         },
@@ -1427,10 +1432,14 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 saveExtensionSettings();
             });
 
-            $avatarSize.on('input', (e) => {
+            $avatarSize.one('input', (e) => { // 使用 one 避免频繁触发渲染，或者添加防抖
                 userState.avatarSize = parseInt($(e.target).val());
                 assistantManager.setAvatar();
                 saveExtensionSettings();
+            });
+
+            $('#lilith-toggle-panel').on('click', () => {
+                assistantManager.togglePanel(window);
             });
 
             $('#lilith-reset-state').on('click', () => {
