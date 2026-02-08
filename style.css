@@ -20,7 +20,7 @@ span.lilith-chat-ui {
     align-items: center;  /* 垂直居中对齐 */
     width: auto;      
     min-width: 50%;   
-    max-width: 100%; 
+    max-width: 90%;   /* 按照脚本逻辑改为 90% */
     background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%) !important;
     border-left: 4px solid #FF69B4 !important; 
     border-radius: 8px;
@@ -50,7 +50,7 @@ span.lilith-chat-text {
     min-width: 0; /* 关键：允许 flex 子项收缩，防止溢出 */
     font-size: 0.9em;
     line-height: 1.4;
-    word-break: break-word;
+    word-break: break-all; /* 按照脚本逻辑改为 break-all */
 }
 
 div.lilith-chat-text {

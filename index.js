@@ -722,13 +722,23 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                                      msgText.includes('```'); // 代码块
 
                     if (userState.commentMode === 'random' && !isComplex) {
-                        // 还原为 \n\n 分隔，确保 Markdown 段落结构不被破坏
-                        const pDelimiter = '\n\n'; 
-                        const parts = msgText.split(pDelimiter).filter(p => p.trim());
+                        let delimiter = '\n\n';
+                        let parts = msgText.split(delimiter).filter(p => p.trim());
+
+                        // 降级策略：如果双换行没有足够的段落，尝试单换行
+                        if (parts.length < 2) {
+                             const singleParts = msgText.split('\n').filter(p => p.trim());
+                             // 只有当单换行切分出足够多的非空行时才使用，避免切碎短句
+                             if (singleParts.length >= 3) {
+                                 delimiter = '\n';
+                                 parts = singleParts;
+                             }
+                        }
+
                         if (parts.length >= 2) {
                             const insertIndex = Math.floor(Math.random() * (parts.length - 1)) + 1;
                             parts.splice(insertIndex, 0, cleanComment);
-                            targetMsgRef.mes = parts.join(pDelimiter);
+                            targetMsgRef.mes = parts.join(delimiter);
                         } else {
                             targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
                         }
@@ -766,51 +776,19 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                             } else {
                                 console.warn('[Lilith] No refresh function found. UI might be desynced until manual refresh.');
                             }
+
+                            // 3. 强制触发 UI 渲染检查 - 解决“UI不显示”的问题
+                            // 这里的延迟是为了等待 ST 的 DOM 渲染完成
+                            setTimeout(() => {
+                                console.log('[Lilith] Performing post-refresh UI check for:', messageId);
+                                handleMessageRendered(null, messageId, true);
+                            }, 800);
+
+                            console.log('[Lilith] Comment injected and refreshed for message', messageId);
                          } catch (e) {
                              console.error('[Lilith] Auto-refresh failed:', e);
                          }
                     }, 500); // 500ms 延迟，确保数据写入完成
-
-                    // 4. [已弃用] 手动 DOM 补丁
-                    // 由于我们现在调用了 reloadCurrentChat，全量刷新会覆盖页面，
-                    // 所以手动补丁不再必要，且可能导致闪烁。
-                    // 但为了在刷新前的短暂间隙提供反馈，我们保留一个轻量级的补丁。
-                    console.log('[Lilith] Applying temporary visual patch...');
-                    setTimeout(() => {
-                        // 寻找对应消息 ID 的文本框，或者寻找包含 [莉莉丝] 且未被渲染的元素
-                        const $textElements = $(`.mes[mes_id="${messageId}"] .mes_text`).length ? 
-                                             $(`.mes[mes_id="${messageId}"] .mes_text`) : 
-                                             $(`.mes`).last().find('.mes_text');
-                        
-                        $textElements.each(function() {
-                            const $el = $(this);
-                            const rawText = targetMsgRef.mes;
-                            if (rawText.includes('[莉莉丝]') && !$el.find('.lilith-chat-ui').length) {
-                                console.log('[Lilith] Forcefully patching DOM for message:', messageId);
-                                // 模拟正则渲染逻辑
-                                const rendered = rawText.split('\n').map(line => {
-                                    if (line.includes('[莉莉丝]')) {
-                                        return line.replace(/\[莉莉丝\]\s*([^<]*)/g, `
-                                            <div class="lilith-chat-ui">
-                                                <div class="lilith-chat-avatar"></div>
-                                                <div class="lilith-chat-text">$1</div>
-                                            </div>
-                                        `);
-                                    }
-                                    return line;
-                                }).join('<br>');
-                                $el.html(rendered);
-                            }
-                        });
-                    }, 400);
-
-                    const textToSpeak = comment.replace('[莉莉丝]', '').replace(/<[^>]*>/g, '').trim(); 
-                    AudioSys.speak(textToSpeak);
-
-                    // 5. 保存到 ST 存档
-                    if (typeof currentContext.saveChat === 'function') currentContext.saveChat();
-                    
-                    console.log('[Lilith] Comment injected and rendered for message', messageId);
                 }
             } catch (e) {
                 console.error('[Lilith] Failed to trigger comment:', e);
