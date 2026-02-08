@@ -713,38 +713,44 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     if (!targetMsgRef) throw new Error("Could not find targets message in chat array");
 
                     // 2. 更新内存数据 - 根据模式选择插入位置
-                    const pDelimiter = '\n\n';
                     const cleanComment = comment.trim();
+                    const msgText = targetMsgRef.mes;
 
-                    if (userState.commentMode === 'random') {
-                        const parts = targetMsgRef.mes.split(pDelimiter).filter(p => p.trim());
+                    // 安全检测：如果正文包含列表、表格、代码块，随机插入极易破坏结构
+                    const isComplex = /^\s*([*+\-]|(\d+\.))\s/m.test(msgText) || // 列表
+                                     msgText.includes('|') || // 表格
+                                     msgText.includes('```'); // 代码块
+
+                    if (userState.commentMode === 'random' && !isComplex) {
+                        // 使用单换行而不是双换行，避免触发 Markdown 的新段落 <p>，从而保护主题美化结构
+                        const pDelimiter = '\n'; 
+                        const parts = msgText.split(pDelimiter).filter(p => p.trim());
                         if (parts.length >= 2) {
                             const insertIndex = Math.floor(Math.random() * (parts.length - 1)) + 1;
-                            parts.splice(insertIndex, 0, cleanComment);
+                            parts.splice(insertIndex, 0, `\n${cleanComment}\n`);
                             targetMsgRef.mes = parts.join(pDelimiter);
                         } else {
-                            targetMsgRef.mes += `\n\n${cleanComment}`;
+                            targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
                         }
                     } else if (userState.commentMode === 'top') {
-                        // 置于顶端
-                        targetMsgRef.mes = `${cleanComment}\n\n` + targetMsgRef.mes.trim();
+                        targetMsgRef.mes = `${cleanComment}\n\n` + msgText.trim();
                     } else {
                         // 始终追加在末尾
-                        targetMsgRef.mes = targetMsgRef.mes.trim() + `\n\n${cleanComment}`;
+                        targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
                     }
                     
                     // 3. 触发渲染
                     console.log('[Lilith] Updating message block for index:', finalIndex);
                     try {
-                        // 获取最新的 context 以避免闭包导致的过期引用
                         const freshContext = SillyTavern.getContext();
-                        const updateFn = freshContext.updateMessageBlock || (typeof updateMessageBlock === 'function' ? updateMessageBlock : null);
-                        
-                        // 严格边界检查
-                        if (typeof updateFn === 'function' && finalIndex >= 0 && finalIndex < freshContext.chat.length) {
-                            updateFn(finalIndex);
-                        } else if (typeof freshContext.printMessages === 'function') {
-                            freshContext.printMessages();
+                        // 修复 TypeError: 确保索引在范围内且函数存在
+                        if (typeof updateMessageBlock === 'function' && finalIndex >= 0 && finalIndex < freshContext.chat.length) {
+                             updateMessageBlock(finalIndex);
+                        } else if (freshContext.updateMessageBlock && typeof freshContext.updateMessageBlock === 'function') {
+                             freshContext.updateMessageBlock(finalIndex);
+                        } else {
+                             // 如果局部刷新失败，尝试全局刷新
+                             if (typeof viewAllMessages === 'function') viewAllMessages();
                         }
                     } catch (err) {
                         console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch fallback.', err);
@@ -1488,9 +1494,9 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 let existing = regexList.find(r => r.scriptName === regexName);
                 const regexTemplate = {
                     scriptName: regexName,
-                    // 优化正则：支持跨行匹配，直到遇到双换行或结尾
-                    findRegex: "(\\[莉莉丝\\])\\s*([\\s\\S]*?)(?=\\n\\n|$)",
-                    replaceString: `\n<div class="lilith-chat-ui">\n    <div class="lilith-chat-avatar"></div>\n    <div class="lilith-chat-text">$2</div> \n</div>\n`,
+                    // 优化正则：增加兼容性，支持 \n 作为边界，保护美化结构
+                    findRegex: "(\\[莉莉丝\\])\\s*([\\s\\S]*?)(?=\\n|$)",
+                    replaceString: `<div class="lilith-chat-ui"><div class="lilith-chat-avatar"></div><div class="lilith-chat-text">$2</div></div>`,
                     trimStrings: [],
                     placement: [2],
                     disabled: false,
@@ -1585,15 +1591,17 @@ The user just received a reply. Your job is to interject with a short, sharp, an
         let html = textElement.html();
         if (!html || !html.includes('[莉莉丝]')) return;
         
-        // 匹配 [莉莉丝] 及其内容，直到遇到段落结尾、双换行或 HTML 标签结束
-        const regex = /\[莉莉丝\]\s*([\s\S]*?)(?=(?:<br\s*\/?>\s*){2,}|<\/p>|\n\n|$)/gi;
+        // 匹配 [莉莉丝] 及其内容，直到遇到换行或 HTML 标签结束
+        const regex = /\[莉莉丝\]\s*([\s\S]*?)(?=<br\s*\/?>|<\/p>|\n|$)/gi;
         
         let hasChanged = false;
         let lastComment = "";
 
         const newHtml = html.replace(regex, (match, content) => {
+            const clean = content.replace(/<[^>]*>/g, '').trim(); 
+            if (!clean) return match;
             hasChanged = true;
-            lastComment = content.trim();
+            lastComment = clean;
             return `
                 <div class="lilith-chat-ui">
                     <div class="lilith-chat-avatar"></div>

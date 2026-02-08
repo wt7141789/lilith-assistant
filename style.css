@@ -10,20 +10,22 @@
 
 /* 消息美化 (来自 regex 脚本) */
 div.lilith-chat-ui {
-    width: 100%;
-    max-width: 900px; 
-    margin: 5px 0; 
+    width: auto; /* 改为 auto，避免撑破气泡 UI */
+    max-width: 100%; 
+    margin: 10px 0; 
     background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%);
     border-left: 4px solid #FF69B4; 
-    border-right: 4px solid #FF69B4;
-    box-shadow: 0 0 15px rgba(255, 105, 180, 0.5), inset 0 0 10px rgba(0,0,0,0.3);
-    border-radius: 8px;
+    border-right: 2px solid rgba(255, 105, 180, 0.3);
+    box-shadow: 0 4px 10px rgba(255, 105, 180, 0.3);
+    border-radius: 12px;
     display: flex;
     align-items: center;
-    padding: 10px;
-    overflow: hidden;
+    padding: 12px;
+    overflow: visible; /* 允许阴影溢出 */
     color: #f0f0f0;
-    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    font-family: inherit; /* 继承正文字体，保持风格统一 */
+    position: relative;
+    z-index: 5;
 }
 
 div.lilith-chat-avatar {
