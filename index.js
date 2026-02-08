@@ -741,21 +741,34 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     
                     // 3. 触发渲染
                     console.log('[Lilith] Updating message block for index:', finalIndex);
-                    try {
-                        // 彻底解决 TypeError: 只有当全局 chat 数组确实存在该索引且有内容时才刷新
-                        if (typeof chat !== 'undefined' && chat[finalIndex] && chat[finalIndex].mes) {
-                             if (typeof updateMessageBlock === 'function') {
-                                 updateMessageBlock(finalIndex);
-                             } else if (context.updateMessageBlock) {
-                                 context.updateMessageBlock(finalIndex);
-                             }
-                        } else {
-                             console.warn('[Lilith] Cache/Global chat mismatch. Skipping native refresh.');
-                             if (typeof viewAllMessages === 'function') viewAllMessages();
+                    // 引入 100ms 强制延迟，确保 ST 内部状态机完成写入
+                    setTimeout(() => {
+                        try {
+                            const freshContext = SillyTavern.getContext();
+                            // 极速获取全局刷新函数（优先原始函数）
+                            const updateFn = window.updateMessageBlock || 
+                                           (typeof updateMessageBlock === 'function' ? updateMessageBlock : null) ||
+                                           freshContext.updateMessageBlock;
+
+                            // 只有在数据真正安全存在时才刷新
+                            if (typeof updateFn === 'function' && 
+                                freshContext.chat && 
+                                freshContext.chat[finalIndex] && 
+                                typeof freshContext.chat[finalIndex].mes !== 'undefined') {
+                                
+                                console.log('[Lilith] SillyTavern refresh API started.');
+                                updateFn(finalIndex);
+                            } else {
+                                throw new Error("Update environment check failed");
+                            }
+                        } catch (err) {
+                            console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch fallback.', err);
+                            // 最终兜底：如果是严重的 TypeError，强制全量刷新一次
+                            if (err instanceof TypeError && typeof viewAllMessages === 'function') {
+                                viewAllMessages();
+                            }
                         }
-                    } catch (err) {
-                        console.warn('[Lilith] SillyTavern refresh API failed, using manual DOM patch fallback.', err);
-                    }
+                    }, 100);
 
                     // 4. 彻底暴力 DOM 补丁 (全量扫描并应用)
                     // 增加延迟确保酒馆自己的渲染已经完成，然后我们覆盖它
@@ -1497,7 +1510,8 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     scriptName: regexName,
                     // 优化正则：匹配 [莉莉丝] 到段落末尾，并确保生成的 HTML 是紧凑的
                     findRegex: "(\\[莉莉丝\\])\\s*([\\s\\S]*?)(?=\\n|$)",
-                    replaceString: `<div class="lilith-chat-ui" style="display:flex !important; visibility:visible !important;"><div class="lilith-chat-avatar"></div><div class="lilith-chat-text">$2</div></div>`,
+                    // 使用 span 而不是 div 作为基础容器，配合 block 样式，极大地减少对正文 P 标签布局的破坏
+                    replaceString: `<span class="lilith-chat-ui-wrapper"><span class="lilith-chat-ui"><span class="lilith-chat-avatar"></span><span class="lilith-chat-text">$2</span></span></span>`,
                     trimStrings: [],
                     placement: [2],
                     disabled: false,
@@ -1604,10 +1618,12 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             hasChanged = true;
             lastComment = clean;
             return `
-                <div class="lilith-chat-ui">
-                    <div class="lilith-chat-avatar"></div>
-                    <div class="lilith-chat-text">${lastComment}</div> 
-                </div>
+                <span class="lilith-chat-ui-wrapper">
+                    <span class="lilith-chat-ui">
+                        <span class="lilith-chat-avatar"></span>
+                        <span class="lilith-chat-text">${lastComment}</span>
+                    </span>
+                </span>
             `;
         });
         

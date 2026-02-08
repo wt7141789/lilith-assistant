@@ -8,34 +8,47 @@
     --l-font: 'Microsoft YaHei', 'Share Tech Mono', sans-serif;
 }
 
-/* 消息美化 (来自 regex 脚本) */
-div.lilith-chat-ui {
-    width: 100%; 
+/* 消息美化 (彻底重构为行内块，保护正文结构) */
+.lilith-chat-ui-wrapper {
+    display: block !important;
+    width: 100%;
+    margin: 15px 0;
+    clear: both;
+}
+
+span.lilith-chat-ui {
+    display: inline-flex !important; /* 使用 inline-flex 避免强制占满一行并切断父级 P 标签 */
+    width: 100%;
     max-width: 100%; 
-    margin: 12px 0; 
     background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%) !important;
     border-left: 4px solid #FF69B4 !important; 
     border-radius: 12px;
-    display: flex !important;
     align-items: center;
     padding: 12px;
     color: #f0f0f0 !important;
     box-sizing: border-box;
-    /* 解决破坏美化结构的关键：阻止父级 flex 压缩 */
-    flex-shrink: 0;
-    clear: both;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
 }
 
-div.lilith-chat-avatar {
-    width: 50px;
-    height: 50px;
-    min-width: 50px;
+span.lilith-chat-avatar {
+    display: inline-block;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
     background-size: cover;
     background-position: center;
     border-radius: 50%;
     border: 2px solid #FF69B4;
     margin-right: 15px;
     flex-shrink: 0;
+}
+
+span.lilith-chat-text {
+    display: inline-block;
+    font-size: 0.95em;
+    line-height: 1.5;
+    word-break: break-word;
+    flex: 1;
 }
 
 div.lilith-chat-text {
