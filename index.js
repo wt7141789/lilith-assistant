@@ -788,21 +788,29 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                                 await saveChat();
                             }
 
-                            // 2. 刷新当前聊天视图 (Reload Current Chat)
-                            if (ctx.reloadCurrentChat) {
-                                console.log('[Lilith] Reloading current chat via Context API...');
-                                await ctx.reloadCurrentChat();
-                            } else if (typeof reloadCurrentChat === 'function') {
-                                console.log('[Lilith] Reloading current chat via Global API...');
-                                await reloadCurrentChat();
-                            } else if (typeof viewAllMessages === 'function') {
-                                viewAllMessages();
+                            // 2. 局部恢复渲染该条消息 (避免重载整个页面导致的滚动跳转)
+                            if (typeof updateMessageBlock === 'function') {
+                                console.log('[Lilith] Surgical update for message index:', finalIndex);
+                                updateMessageBlock(finalIndex);
                             } else {
-                                console.warn('[Lilith] No refresh function found. UI might be desynced until manual refresh.');
+                                // 降级方案：如果不存在局部刷新，则重载
+                                if (ctx.reloadCurrentChat) {
+                                    await ctx.reloadCurrentChat();
+                                } else if (typeof reloadCurrentChat === 'function') {
+                                    await reloadCurrentChat();
+                                } else if (typeof viewAllMessages === 'function') {
+                                    viewAllMessages();
+                                }
                             }
 
                             // 3. 吐槽播报
                             AudioSys.speak(cleanComment.replace(/\[莉莉丝\]/g, '').trim());
+
+                            // 4. 确保消息在视口内 (可选，防止长消息被顶出)
+                            setTimeout(() => {
+                                const el = document.querySelector(`[mes_id="${messageId}"]`);
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }, 200);
 
                             console.log('[Lilith] Comment injected and refreshed for message', messageId);
                          } catch (e) {
