@@ -9,55 +9,65 @@
 }
 
 /* 消息美化 (彻底重构为行内块，保护正文结构) */
+.lilith-raw-trigger {
+    display: none !important;
+}
+
 .lilith-chat-ui-wrapper {
-    display: block; /* 恢复为 block，确保换行，但不强求 !important */
-    margin: 10px 0;
-    max-width: 100%;
-}
-
-span.lilith-chat-ui {
-    display: inline-flex !important; /* 使用 inline-flex 修复包裹和布局问题 */
-    align-items: center;  /* 垂直居中对齐 */
-    width: auto;      
-    min-width: 50%;   
-    max-width: 90%;   /* 按照脚本逻辑改为 90% */
-    background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%) !important;
-    border-left: 4px solid #FF69B4 !important; 
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: #f0f0f0 !important;
-    box-sizing: border-box;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-    vertical-align: middle;
-}
-
-span.lilith-chat-avatar {
     display: block;
-    flex-shrink: 0; /* 防止头像被压缩 */
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
+    margin: 12px 0;
+    max-width: 100%;
+    animation: lilith-slide-in 0.4s ease-out;
+}
+
+@keyframes lilith-slide-in {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+div.lilith-chat-ui {
+    display: flex !important;
+    align-items: center;
+    width: auto;
+    max-width: 95%;
+    background: linear-gradient(90deg, rgba(48, 13, 28, 0.95) 0%, rgba(128, 20, 60, 0.9) 100%) !important;
+    border-left: 4px solid #FF69B4 !important;
+    border-right: 4px solid #FF69B4 !important;
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #fce4ec !important;
+    box-shadow: 0 0 20px rgba(255, 105, 180, 0.3), inset 0 0 10px rgba(0,0,0,0.5);
+    margin: 5px 0;
+    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+div.lilith-chat-ui:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 25px rgba(255, 105, 180, 0.5);
+    transform: translateY(-1px);
+}
+
+.lilith-chat-avatar {
+    width: 55px;
+    height: 55px;
+    min-width: 55px;
     background-size: cover;
     background-position: center;
     border-radius: 50%;
     border: 2px solid #FF69B4;
-    margin-right: 10px;
+    margin-right: 15px;
+    box-shadow: 0 0 10px rgba(255, 105, 180, 0.6);
+    background-image: url('https://i.postimg.cc/rmD7bxxH/IMG-20251102-000620.jpg'); /* 默认头像 */
 }
 
-span.lilith-chat-text {
-    display: block;
-    flex: 1;      /* 占据剩余空间 */
-    min-width: 0; /* 关键：允许 flex 子项收缩，防止溢出 */
-    font-size: 0.9em;
-    line-height: 1.4;
-    word-break: break-all; /* 按照脚本逻辑改为 break-all */
-}
-
-div.lilith-chat-text {
+.lilith-chat-text {
+    flex: 1;
     font-size: 0.95em;
     line-height: 1.6;
     font-weight: 500;
-    text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
+    text-shadow: 0 0 5px rgba(255, 105, 180, 0.4);
     white-space: pre-wrap;
     word-break: break-all;
     flex: 1; /* 确保占据剩余空间 */
@@ -453,7 +463,7 @@ div.lilith-chat-text {
     transform: translateX(100%);
 }
 
-.l-cfg-box input[type=range] { -webkit-appearance: none; width: 100%; background: rgba(255,255,255,0.1); border-radius: 10px; height: 6px; }
+.l-cfg-box input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: rgba(255,255,255,0.1); border-radius: 10px; height: 6px; }
 .l-cfg-box input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: #00f3ff; cursor: pointer; box-shadow: 0 0 10px #00f3ff; }
 
 .l-trivia-box { background: rgba(0,0,0,0.8); border: 2px solid #00f3ff; padding: 15px; color: #fff; width: 300px; text-align: center; }
@@ -508,3 +518,43 @@ div.lilith-chat-text {
     text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
     flex: 1;
 }
+
+/* Image Cache Manager Styles */
+#st-chatu8-settings .st-chatu8-image-cache-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+#st-chatu8-settings .st-chatu8-image-cache-item {
+    position: relative;
+    cursor: pointer;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--st-chatu8-bg-tertiary, var(--drawer_bg, #333));
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+#st-chatu8-settings .st-chatu8-image-cache-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#st-chatu8-settings .st-chatu8-image-cache-item img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    display: block;
+}
+
+#st-chatu8-settings .st-chatu8-image-info {
+    padding: 8px;
+    font-size: 0.8rem;
+    text-align: center;
+    color: var(--st-chatu8-text-secondary, var(--text_color, #ccc));
+    background-color: var(--st-chatu8-bg-secondary, rgba(0,0,0,0.5));
+}
+
