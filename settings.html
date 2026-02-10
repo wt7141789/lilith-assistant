@@ -31,6 +31,57 @@
 
         <hr class="sysHR" />
 
+        <!-- [新增] 正文提取设置 -->
+        <div class="settings_section">
+            <h4 style="margin: 5px 0; opacity: 0.9;">正文提取 (Content Extraction)</h4>
+            <div class="flex-container alignItemCenter">
+                <input type="checkbox" id="lilith-extraction-enabled">
+                <label for="lilith-extraction-enabled">启用正文提取 (净化Lilith读取的内容)</label>
+            </div>
+            <div style="margin-top: 5px;">
+                <label for="lilith-extraction-regex">前后正则 (用于切掉前后文):</label>
+                <input type="text" id="lilith-extraction-regex" class="text_pole" placeholder="例如: <正文>|</正文> 或 (?s)<think>.*?</think>(.*)">
+                <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:2px;">
+                    规则：设定了前后正则后，Lilith只会读取和吐槽符合规则的内容。<br>
+                    支持简写：&lt;开始标记&gt;|&lt;结束标记&gt; (自动提取中间内容)。
+                </small>
+            </div>
+
+            <!-- [新增] 文字替换设置 -->
+            <div style="margin-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1); padding-top: 10px;">
+                <div class="flex-container alignItemCenter">
+                    <input type="checkbox" id="lilith-text-replacement-enabled">
+                    <label for="lilith-text-replacement-enabled">启用内容替换 (文字正则)</label>
+                </div>
+                <div style="margin-top: 5px;">
+                    <label for="lilith-text-replacement-regex">文字正则 (用于替换内容):</label>
+                    <input type="text" id="lilith-text-replacement-regex" class="text_pole" placeholder="例如: \[|\] 或 \[.*?\]">
+                    <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:2px;">
+                        规则：被匹配到的内容会被“替换为”中的内容取代。<br>
+                        支持简写：A|B (自动匹配A...B之间的内容，如 [|] 匹配 [动作])。
+                    </small>
+                </div>
+                <div style="margin-top: 5px;">
+                    <label for="lilith-text-replacement-string">替换为 (留空则删除):</label>
+                    <input type="text" id="lilith-text-replacement-string" class="text_pole" placeholder="">
+                </div>
+            </div>
+            
+            <div style="margin-top:10px; border: 1px solid var(--SmartThemeBorderColor); padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.2);">
+                <label style="font-weight:bold;">正则测试区</label>
+                <textarea id="lilith-extraction-test-input" class="text_pole" rows="3" placeholder="在此输入测试文本..." style="margin:5px 0; width:100%; box-sizing:border-box;"></textarea>
+                <div class="flex-container">
+                     <button id="lilith-extraction-test-btn" class="menu_button" style="width: auto; padding: 5px 15px;">测试提取</button>
+                </div>
+                <div style="margin-top:5px;">
+                    <label>提取结果:</label>
+                    <div id="lilith-extraction-test-result" style="background:var(--SmartThemeInputBackground); color:var(--SmartThemeBodyColor); padding:5px; min-height:20px; white-space: pre-wrap; border-radius:4px; border: 1px solid var(--SmartThemeBorderColor); font-family: monospace;"></div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="sysHR" />
+
         <!-- 开关选项 -->
         <div class="settings_section flex-container alignItemCenter">
             <input type="checkbox" id="lilith-hide-avatar">

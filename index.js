@@ -466,7 +466,10 @@
         commentMode: 'random', // 'random', 'bottom', 'top'
         commentFrequency: 30, // 默认 30% 概率
         // [新增] TTS 配置
-        ttsConfig: { pitch: 1.2, rate: 1.3 }
+        ttsConfig: { pitch: 1.2, rate: 1.3 },
+        // [新增] 正文提取
+        extractionEnabled: false,
+        extractionRegex: ''
     };
     
     let userState = getExtensionSettings().userState;
@@ -483,6 +486,12 @@
     if (userState.commentMode === undefined) userState.commentMode = 'random';
     if (userState.ttsConfig === undefined) userState.ttsConfig = { pitch: 1.2, rate: 1.3 };
     if (userState.commentFrequency === undefined) userState.commentFrequency = 50;
+    if (userState.extractionEnabled === undefined) userState.extractionEnabled = false;
+    if (userState.extractionRegex === undefined) userState.extractionRegex = '';
+    // [新增] 文字替换
+    if (userState.textReplacementEnabled === undefined) userState.textReplacementEnabled = false;
+    if (userState.textReplacementRegex === undefined) userState.textReplacementRegex = '';
+    if (userState.textReplacementString === undefined) userState.textReplacementString = '';
 
     let panelChatHistory = getExtensionSettings().chatHistory || [];
 
@@ -508,6 +517,58 @@
         return parseInt(n);
     }
 
+    // Helper: 支持自定义正则或简易 'Start|End' 分隔符格式
+    function createSmartRegExp(input, flags = 's') {
+        if (!input) return null;
+        // Case: <正文>|</正文> (Tag|Tag)
+        // 只有当包含 | 且不包含 () 时才视为简易分隔符模式，转为 Start([\s\S]*?)End
+        if (input.includes('|') && !input.includes('(') && !input.includes(')')) {
+            const parts = input.split('|');
+            if (parts.length === 2) {
+                const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const start = escape(parts[0].trim());
+                const end = escape(parts[1].trim());
+                if (start && end) {
+                    return new RegExp(`${start}([\\s\\S]*?)${end}`, flags);
+                }
+            }
+        }
+        return new RegExp(input, flags);
+    }
+
+    function extractContent(text) {
+        if (!text) return text;
+        
+        let result = text;
+
+        // 1. [Extraction] 切掉前后文
+        if (userState.extractionEnabled && userState.extractionRegex) {
+            try {
+                const pattern = createSmartRegExp(userState.extractionRegex, 's'); 
+                const match = pattern.exec(result);
+                if (match) {
+                    result = match[1] !== undefined ? match[1] : match[0];
+                }
+            } catch (e) {
+                console.error('[Lilith] Regex Extraction Error:', e);
+            }
+        }
+
+        // 2. [Replacement] 文字替换
+        if (userState.textReplacementEnabled && userState.textReplacementRegex) {
+            try {
+                // Use 'g' flag for global replacement
+                const regex = createSmartRegExp(userState.textReplacementRegex, 'g'); 
+                const replacement = userState.textReplacementString || '';
+                result = result.replace(regex, replacement);
+            } catch (e) {
+                 console.error('[Lilith] Regex Replacement Error:', e);
+            }
+        }
+
+        return result;
+    }
+
     function getPageContext(limit = 15) {
         try {
             const chatDiv = document.getElementById('chat');
@@ -515,7 +576,8 @@
             const messages = Array.from(chatDiv.querySelectorAll('.mes'));
             return messages.slice(-limit).map(msg => {
                 const name = msg.getAttribute('ch_name') || 'User';
-                const text = msg.querySelector('.mes_text')?.innerText || '';
+                let text = msg.querySelector('.mes_text')?.innerText || '';
+                text = extractContent(text); // Apply extraction
                 return { name, message: text };
             }).filter(m => m.message.length > 1);
         } catch (e) { return []; }
@@ -975,52 +1037,94 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                     // 2. 更新内存数据 - 根据模式选择插入位置
                     const cleanComment = comment.trim();
                     const msgText = targetMsgRef.mes;
+                    
+                    let targetContent = msgText;
+                    let prefix = "";
+                    let suffix = "";
 
-                    // --- 核心优化：语义化安全插入策略 ---
-                    const lines = msgText.split('\n');
-                    let inCodeBlock = false;
-                    const safePoints = [];
-
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        // 1. 状态追踪：避开代码块、表格、列表
-                        if (line.startsWith('```')) {
-                            inCodeBlock = !inCodeBlock;
-                            continue;
-                        }
-                        if (inCodeBlock || line.includes('|') || /^[*+\-]\s|^\d+\.\s/.test(line)) continue;
-                        
-                        // 2. 评分逻辑：优先选择带结束标点的行
-                        if (line.length > 1 && i < lines.length - 1) {
-                            const priority = /[。！？!?.]$/.test(line) ? 2 : 1;
-                            safePoints.push({ index: i, priority });
+                    // [新增] 提取正文范围逻辑：确保吐槽只注入到“提取出的正文”中
+                    if (userState.extractionEnabled && userState.extractionRegex) {
+                        try {
+                            const pattern = createSmartRegExp(userState.extractionRegex, 's');
+                            const match = pattern.exec(msgText);
+                            if (match) {
+                                // 优先提取 Group 1，否则 Match[0]
+                                const captured = match[1] !== undefined ? match[1] : match[0];
+                                
+                                // 定位 captured 在 msgText 中的位置
+                                // 注意：match.index 是 match[0] 的起点
+                                const fullMatch = match[0];
+                                const localStart = fullMatch.indexOf(captured);
+                                
+                                if (localStart !== -1) {
+                                    const globalStart = match.index + localStart;
+                                    const globalEnd = globalStart + captured.length;
+                                    
+                                    prefix = msgText.substring(0, globalStart);
+                                    targetContent = captured;
+                                    suffix = msgText.substring(globalEnd);
+                                    console.log(`[Lilith] Injection confined to extracted range: [${globalStart}, ${globalEnd}]`);
+                                }
+                            }
+                        } catch (e) {
+                            console.error('[Lilith] Injection extraction failed, falling back to full text:', e);
                         }
                     }
 
-                    if (userState.commentMode === 'random' && safePoints.length > 0) {
-                        // 权重筛选：优先选高优先级点
-                        const highPrio = safePoints.filter(p => p.priority === 2);
-                        const candidates = highPrio.length > 0 ? highPrio : safePoints;
-                        const pick = candidates[Math.floor(Math.random() * candidates.length)];
-                        const targetPoint = pick.index;
-
-                        // 3. 智能间距处理
-                        const nextLineEmpty = lines[targetPoint + 1] !== undefined && lines[targetPoint + 1].trim() === "";
-                        const prevLineEmpty = lines[targetPoint].trim() === "";
-                        
-                        let insertBatch = [cleanComment];
-                        if (!prevLineEmpty) insertBatch.unshift("");
-                        if (!nextLineEmpty) insertBatch.push("");
-                        
-                        lines.splice(targetPoint + 1, 0, ...insertBatch);
-                        targetMsgRef.mes = lines.join('\n');
-                        console.log(`[Lilith] Smart insertion at line ${targetPoint} (Priority: ${pick.priority})`);
-                    } else if (userState.commentMode === 'top') {
-                        targetMsgRef.mes = `${cleanComment}\n\n` + msgText.trim();
+                    let newContent = targetContent;
+                    
+                    if (userState.commentMode === 'top') {
+                        newContent = `${cleanComment}\n\n${targetContent.trimStart()}`;
+                    } else if (userState.commentMode === 'bottom') {
+                        newContent = `${targetContent.trimEnd()}\n\n${cleanComment}`;
                     } else {
-                        // 始终追加在末尾
-                        targetMsgRef.mes = msgText.trim() + `\n\n${cleanComment}`;
+                        // --- Random Mode: 智能语义插入 ---
+                        const lines = targetContent.split('\n');
+                        let inCodeBlock = false;
+                        const safePoints = [];
+
+                        for (let i = 0; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            // 1. 状态追踪：避开代码块、表格、列表
+                            if (line.startsWith('```')) {
+                                inCodeBlock = !inCodeBlock;
+                                continue;
+                            }
+                            if (inCodeBlock || line.includes('|') || /^[*+\-]\s|^\d+\.\s/.test(line)) continue;
+                            
+                            // 2. 评分逻辑：优先选择带结束标点的行
+                            if (line.length > 1 && i < lines.length - 1) {
+                                const priority = /[。！？!?.]$/.test(line) ? 2 : 1;
+                                safePoints.push({ index: i, priority });
+                            }
+                        }
+
+                        if (safePoints.length > 0) {
+                            // 权重筛选：优先选高优先级点
+                            const highPrio = safePoints.filter(p => p.priority === 2);
+                            const candidates = highPrio.length > 0 ? highPrio : safePoints;
+                            const pick = candidates[Math.floor(Math.random() * candidates.length)];
+                            const targetPoint = pick.index;
+
+                            // 3. 智能间距处理
+                            const nextLineEmpty = lines[targetPoint + 1] !== undefined && lines[targetPoint + 1].trim() === "";
+                            const prevLineEmpty = lines[targetPoint].trim() === "";
+                            
+                            let insertBatch = [cleanComment];
+                            if (!prevLineEmpty) insertBatch.unshift("");
+                            if (!nextLineEmpty) insertBatch.push("");
+                            
+                            lines.splice(targetPoint + 1, 0, ...insertBatch);
+                            newContent = lines.join('\n');
+                            console.log(`[Lilith] Smart insertion at line ${targetPoint} (Priority: ${pick.priority})`);
+                        } else {
+                            // 没找到合适位置，兜底到底部
+                            newContent = `${targetContent.trimEnd()}\n\n${cleanComment}`;
+                        }
                     }
+                    
+                    // 重新组装完整消息
+                    targetMsgRef.mes = prefix + newContent + suffix;
                     
                     // 3. 保存 + 让酒馆自己重渲染这一条消息，由事件钩子接管美化
                     console.log('[Lilith] Updating message block for messageId:', messageId, 'index:', liveIndex);
@@ -1662,6 +1766,10 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 userState.hideAvatar = document.getElementById('cfg-hide-avatar').checked;
                 userState.avatarSize = parseInt(document.getElementById('cfg-avatar-size').value);
                 
+                // Save Comment Settings (Sync to UserState)
+                userState.commentFrequency = parseInt(document.getElementById('cfg-freq').value);
+                userState.commentMode = document.getElementById('cfg-comment-mode').value;
+
                 saveState();
                 
                 getExtensionSettings().apiConfig = this.config;
@@ -1669,6 +1777,13 @@ The user just received a reply. Your job is to interject with a short, sharp, an
                 saveExtensionSettings();
 
                 this.updateAvatarStyle(parentWin);
+                
+                // [Sync] Update Extension Settings Panel if open
+                $('#lilith-comment-frequency').val(userState.commentFrequency);
+                $('#lilith-freq-value').text(`${userState.commentFrequency}%`);
+                $('#lilith-comment-mode').val(userState.commentMode);
+                $('#lilith-hide-avatar').prop('checked', userState.hideAvatar);
+                $('#lilith-avatar-size').val(userState.avatarSize);
 
                 const msgBox = document.getElementById('cfg-msg'); msgBox.textContent = "✅ 记住了"; msgBox.style.color = "#0f0";
             });
@@ -1769,28 +1884,146 @@ The user just received a reply. Your job is to interject with a short, sharp, an
             $hideAvatar.prop('checked', userState.hideAvatar);
             $avatarSize.val(userState.avatarSize || 150);
 
+            // [新增] 正文提取 UI 绑定
+            const $extractEnable = $('#lilith-extraction-enabled');
+            const $extractRegex = $('#lilith-extraction-regex');
+
+            // [新增] 文字替换 UI 绑定
+            const $replEnable = $('#lilith-text-replacement-enabled');
+            const $replRegex = $('#lilith-text-replacement-regex');
+            const $replString = $('#lilith-text-replacement-string');
+
+            $extractEnable.prop('checked', userState.extractionEnabled);
+            $extractRegex.val(userState.extractionRegex);
+
+            $replEnable.prop('checked', userState.textReplacementEnabled);
+            $replRegex.val(userState.textReplacementRegex);
+            $replString.val(userState.textReplacementString);
+
+            $extractEnable.on('change', (e) => {
+                userState.extractionEnabled = $(e.target).prop('checked');
+                saveExtensionSettings();
+            });
+
+            $extractRegex.on('change', (e) => {
+                userState.extractionRegex = $(e.target).val();
+                saveExtensionSettings();
+            });
+
+            $replEnable.on('change', (e) => {
+                userState.textReplacementEnabled = $(e.target).prop('checked');
+                saveExtensionSettings();
+            });
+            
+            $replRegex.on('change', (e) => {
+                userState.textReplacementRegex = $(e.target).val();
+                saveExtensionSettings();
+            });
+            
+            $replString.on('change', (e) => {
+                userState.textReplacementString = $(e.target).val();
+                saveExtensionSettings();
+            });
+
+            $('#lilith-extraction-test-btn').on('click', () => {
+                const input = $('#lilith-extraction-test-input').val();
+                const extractRegexStr = $extractRegex.val();
+                const replRegexStr = $replRegex.val();
+                const replStr = $replString.val();
+                
+                const useExtract = $extractEnable.prop('checked');
+                const useRepl = $replEnable.prop('checked');
+
+                let result = input;
+                let log = [];
+
+                // 1. Extraction Test
+                if (useExtract && extractRegexStr) {
+                    try {
+                        const pattern = createSmartRegExp(extractRegexStr, 's');
+                        const match = pattern.exec(result);
+                        if (match) {
+                            result = match[1] !== undefined ? match[1] : match[0];
+                            log.push("Extraction: OK");
+                        } else {
+                            log.push("Extraction: No Match");
+                        }
+                    } catch (err) {
+                        log.push("Extraction Error: " + err.message);
+                    }
+                }
+
+                // 2. Replacement Test
+                if (useRepl && replRegexStr) {
+                    try {
+                        const pattern = createSmartRegExp(replRegexStr, 'g');
+                        const before = result;
+                        result = result.replace(pattern, replStr || "");
+                        if (result !== before) {
+                             log.push("Replace: OK");
+                        } else {
+                             log.push("Replace: No Match");
+                        }
+                    } catch (err) {
+                        log.push("Replace Error: " + err.message);
+                    }
+                }
+
+                const $display = $('#lilith-extraction-test-result');
+                $display.text(`[Logs: ${log.join(' | ')}]\n---\n${result}`);
+                
+                // Visual feedback
+                $display.css('color', '#aaffaa');
+                setTimeout(() => $display.css('color', 'var(--SmartThemeBodyColor)'), 500);
+            });
+
             // 绑定事件
             $freq.on('input', (e) => {
                 const val = parseInt($(e.target).val());
                 userState.commentFrequency = val;
                 $freqVal.text(`${val}%`);
+                
+                // [Sync] Update Floating Panel
+                const cfgFreq = document.getElementById('cfg-freq');
+                const cfgFreqVal = document.getElementById('cfg-freq-val');
+                if(cfgFreq) cfgFreq.value = val;
+                if(cfgFreqVal) cfgFreqVal.textContent = val;
+
                 saveExtensionSettings();
             });
 
             $mode.on('change', (e) => {
                 userState.commentMode = $(e.target).val();
+                
+                // [Sync] Update Floating Panel
+                const cfgMode = document.getElementById('cfg-comment-mode');
+                if(cfgMode) cfgMode.value = userState.commentMode;
+
                 saveExtensionSettings();
             });
 
             $hideAvatar.on('change', (e) => {
                 userState.hideAvatar = $(e.target).prop('checked');
                 assistantManager.setAvatar();
+                assistantManager.updateAvatarStyle(window);
+                
+                // [Sync] Update Floating Panel
+                const cfgHide = document.getElementById('cfg-hide-avatar');
+                if(cfgHide) cfgHide.checked = userState.hideAvatar;
+
                 saveExtensionSettings();
             });
 
-            $avatarSize.one('input', (e) => { // 使用 one 避免频繁触发渲染，或者添加防抖
+            $avatarSize.on('input', (e) => { 
                 userState.avatarSize = parseInt($(e.target).val());
-                assistantManager.setAvatar();
+                assistantManager.updateAvatarStyle(window);
+                
+                // [Sync] Update Floating Panel
+                const cfgSize = document.getElementById('cfg-avatar-size');
+                const cfgSizeVal = document.getElementById('cfg-size-val');
+                if(cfgSize) cfgSize.value = userState.avatarSize;
+                if(cfgSizeVal) cfgSizeVal.textContent = userState.avatarSize;
+
                 saveExtensionSettings();
             });
 
