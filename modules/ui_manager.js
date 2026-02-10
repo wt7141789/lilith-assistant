@@ -136,9 +136,6 @@ export const UIManager = {
                     <div id="lilith-chat-history"></div>
                     <div class="lilith-chat-footer">
                         <div class="lilith-input-row">
-                            <button id="lilith-manual-comment-chat" title="强制吐槽" style="color:#bd00ff;">
-                                <i class="fa-solid fa-comment-dots"></i>
-                            </button>
                             <button id="lilith-polish-btn" title="搞颜色/润色" style="color:#ff0055;">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>
                             </button>
@@ -151,7 +148,6 @@ export const UIManager = {
                 </div>
                 <div id="page-tools" class="lilith-page">
                     <div class="tools-grid">
-                        <button class="tool-btn" id="tool-comment" style="grid-column: span 2; border-color:#bd00ff; color:#bd00ff; font-weight:bold;">💬 强制吐槽 (主线)</button>
                         <button class="tool-btn" id="tool-analyze">🧠 局势嘲讽</button>
                         <button class="tool-btn" id="tool-audit">⚖️ 找茬模式</button>
                         <button class="tool-btn" id="tool-branch" style="grid-column: span 2; border-color:#ffd700;">🔮 恶作剧推演 (我)</button>
@@ -539,9 +535,6 @@ export const UIManager = {
         sendBtn?.addEventListener('click', doSend);
         input?.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.stopPropagation(); doSend(); } });
 
-        // Manual Comment
-        document.getElementById('lilith-manual-comment-chat')?.addEventListener('click', () => assistant.manualComment());
-
         // Polish
         document.getElementById('lilith-polish-btn')?.addEventListener('click', async () => {
             const raw = input.value.trim(); if(!raw) return;
@@ -555,7 +548,6 @@ export const UIManager = {
         });
 
         // Tools
-        document.getElementById('tool-comment')?.addEventListener('click', () => assistant.manualComment());
         document.getElementById('tool-analyze')?.addEventListener('click', () => assistant.runTool(window, "局势嘲讽"));
         document.getElementById('tool-audit')?.addEventListener('click', () => assistant.runTool(window, "找茬模式"));
         document.getElementById('tool-branch')?.addEventListener('click', () => assistant.runTool(window, "恶作剧推演"));
@@ -1346,10 +1338,6 @@ export const UIManager = {
 
             $('#lilith-toggle-panel').on('click', () => {
                 this.togglePanel();
-            });
-
-            $('#lilith-manual-comment').on('click', () => {
-                assistant.manualComment();
             });
 
             $('#lilith-reset-pos').on('click', () => {

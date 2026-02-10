@@ -393,34 +393,6 @@ export const assistantManager = {
         }
     },
 
-    /**
-     * 手动触发吐槽逻辑
-     */
-    async manualComment() {
-        const context = SillyTavern.getContext();
-        const chat = context.chat || [];
-        if (chat.length === 0) return;
-
-        // 寻找最后一个非用户非系统的消息作为锚点
-        let lastAiMsg = null;
-        for (let i = chat.length - 1; i >= 0; i--) {
-            if (!chat[i].is_user && !chat[i].is_system) {
-                lastAiMsg = chat[i];
-                break;
-            }
-        }
-
-        if (!lastAiMsg) {
-            if (typeof UIManager !== 'undefined' && UIManager.showBubble) {
-                UIManager.showBubble("这里连个能吐槽的人都没有...", "#ff0055");
-            }
-            return;
-        }
-
-        const messageId = lastAiMsg.message_id || lastAiMsg.mesid || chat.indexOf(lastAiMsg);
-        await this.triggerRealtimeComment(messageId);
-    },
-
     async triggerRealtimeComment(messageId) {
         console.log('[Lilith] triggerRealtimeComment called for messageId', messageId);
         const context = SillyTavern.getContext();
