@@ -34,6 +34,26 @@
         <!-- [新增] 正文提取设置 -->
         <div class="settings_section">
             <h4 style="margin: 5px 0; opacity: 0.9;">正文提取 (Content Extraction)</h4>
+            
+            <!-- [新增] 正则方案联动 -->
+            <div style="margin-bottom: 10px; background: rgba(0, 243, 255, 0.05); padding: 8px; border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 4px;">
+                <label style="font-size: 0.85em; color: var(--l-cyan); font-weight: bold;">🛡️ 方案管理 (Regex Presets)</label>
+                <div class="flex-container alignItemCenter" style="gap: 5px; margin-top: 5px;">
+                    <select id="lilith-regex-preset-select" class="text_pole" style="flex: 1; height: 30px;">
+                        <option value="">-- 选择方案 --</option>
+                    </select>
+                    <button id="lilith-regex-save" class="menu_button" style="width: auto; padding: 0 10px;" title="将当前配置归档为方案">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                    </button>
+                    <button id="lilith-regex-delete" class="menu_button" style="width: auto; padding: 0 10px; color: var(--red);" title="从库中删除此方案">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+                <div style="margin-top: 5px; display: none;" id="lilith-regex-name-container">
+                    <input type="text" id="lilith-regex-new-name" class="text_pole" placeholder="输入新方案名称..." style="height: 25px; font-size: 0.8em;">
+                </div>
+            </div>
+
             <div class="flex-container alignItemCenter">
                 <input type="checkbox" id="lilith-extraction-enabled">
                 <label for="lilith-extraction-enabled">启用正文提取 (净化Lilith读取的内容)</label>
@@ -88,8 +108,16 @@
             <label for="lilith-hide-avatar">隐藏右下角看板娘 (仅保留正文渲染)</label>
         </div>
 
-        <div class="settings_section flex-container">
-            <button id="lilith-toggle-panel" class="menu_button" style="flex:1;">打开/关闭 交互面板</button>
+        <div class="settings_section flex-container" style="gap:10px; margin-top: 10px;">
+            <button id="lilith-manual-comment" class="menu_button" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px; border-color: #bd00ff66;">
+                <i class="fa-solid fa-comment-dots"></i> 强制吐槽
+            </button>
+            <button id="lilith-reset-pos" class="menu_button" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <i class="fa-solid fa-location-arrow"></i> 重置位置
+            </button>
+            <button id="lilith-toggle-panel" class="menu_button" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <i class="fa-solid fa-window-maximize"></i> 开关面版
+            </button>
         </div>
 
         <div class="settings_section">
@@ -100,7 +128,9 @@
         <hr class="sysHR" />
 
         <div class="settings_section">
-            <button id="lilith-reset-state" class="menu_button" style="color: var(--red);">重置好感度与状态</button>
+            <button id="lilith-reset-state" class="menu_button" style="color: #ff5555; border-color: rgba(255, 85, 85, 0.3); width: 100%; display:flex; align-items:center; justify-content:center; gap:5px;">
+                <i class="fa-solid fa-triangle-exclamation"></i> 危险：清空好感度与记忆
+            </button>
         </div>
     </div>
 </div>

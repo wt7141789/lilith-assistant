@@ -112,8 +112,13 @@ export const EventManager = {
 
             // 5. Global Message Card Clicks (Replay Audio)
             $(document).on('click', '.lilith-chat-ui', function() {
-                const text = $(this).find('.lilith-chat-text').text();
-                if (text) AudioSys.speak(text);
+                // 优先查找正文文本，如果没找到则查找通用文本类，最后取整个容器文本
+                const text = $(this).find('.l-speech-text').text() || $(this).find('.lilith-chat-text').text() || $(this).text();
+                if (text) {
+                    // 清理一些符号和标签
+                    const cleanText = text.replace(/🩸|💭|\*/g, '').trim();
+                    if (cleanText) AudioSys.speak(cleanText);
+                }
             });
 
         } catch (e) {

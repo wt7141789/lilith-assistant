@@ -3,7 +3,7 @@ import { extensionName, avatarId, bubbleId, MAX_HISTORY_TRIGGER, HISTORY_KEEP, P
 import { userState, saveState, saveChat, panelChatHistory, updateFavor, updateSanity } from './storage.js';
 import { AudioSys } from './audio.js';
 import { getDynamicPersona } from './persona.js';
-import { getPageContext, createSmartRegExp } from './utils.js';
+import { getPageContext, createSmartRegExp, extractContent } from './utils.js';
 import { UIManager } from './ui_manager.js';
 
 export const assistantManager = {
@@ -15,7 +15,80 @@ export const assistantManager = {
     },
 
     extensionPath: `/scripts/extensions/third-party/${extensionName}`,
-    
+
+    // --- API 预设管理 ---
+    savePreset(name, config) {
+        if (!name) return;
+        const currentConfig = config || { ...this.config };
+        const presets = userState.apiPresets || [];
+        const index = presets.findIndex(p => p.name === name);
+        
+        if (index !== -1) presets[index] = { name, config: currentConfig };
+        else presets.push({ name, config: currentConfig });
+        
+        userState.apiPresets = presets;
+        this.config = { ...currentConfig };
+        userState.apiConfig = { ...currentConfig };
+        saveState();
+    },
+
+    loadPreset(name) {
+        const presets = userState.apiPresets || [];
+        const preset = presets.find(p => p.name === name);
+        if (preset) {
+            this.config = JSON.parse(JSON.stringify(preset.config || preset.apiConfig || {}));
+            userState.apiConfig = JSON.parse(JSON.stringify(this.config));
+            saveState();
+            return true;
+        }
+        return false;
+    },
+
+    // --- 正则方案管理 (Regex Presets) ---
+    saveRegexPreset(name) {
+        if (!name) return;
+        const presets = userState.regexPresets || [];
+        const currentRegex = {
+            enabled: !!userState.extractionEnabled,
+            regex: userState.extractionRegex || '',
+            replEnabled: !!userState.textReplacementEnabled,
+            replRegex: userState.textReplacementRegex || '',
+            replString: userState.textReplacementString || ''
+        };
+        const index = presets.findIndex(p => p.name === name);
+        if (index !== -1) presets[index] = { name, data: currentRegex };
+        else presets.push({ name, data: currentRegex });
+        userState.regexPresets = presets;
+        saveState();
+    },
+
+    loadRegexPreset(name) {
+        const presets = userState.regexPresets || [];
+        const preset = presets.find(p => p.name === name);
+        if (preset && preset.data) {
+            userState.extractionEnabled = !!preset.data.enabled;
+            userState.extractionRegex = preset.data.regex || '';
+            userState.textReplacementEnabled = !!preset.data.replEnabled;
+            userState.textReplacementRegex = preset.data.replRegex || '';
+            userState.textReplacementString = preset.data.replString || '';
+            saveState();
+            return true;
+        }
+        return false;
+    },
+
+    deleteRegexPreset(name) {
+        const presets = userState.regexPresets || [];
+        userState.regexPresets = presets.filter(p => p.name !== name);
+        saveState();
+    },
+
+    deletePreset(name) {
+        const presets = userState.apiPresets || [];
+        userState.apiPresets = presets.filter(p => p.name !== name);
+        saveState();
+    },
+
     sendToSillyTavern(parentWin, text, autoSend = true) {
         const input = parentWin.document.getElementById('send_textarea');
         if (input) {
@@ -260,25 +333,26 @@ export const assistantManager = {
     },
 
     async callUniversalAPI(parentWin, text, options = {}) {
-        const { isChat = false, mode = "normal", systemPrompt = null } = options; 
-        const isInternal = mode === 'memory_internal';
-        const { apiType, apiKey, baseUrl, model } = this.config; 
-        if (!apiKey) return null;
-        
-        let url = baseUrl.replace(/\/$/, ''); 
-        let finalSystemPrompt = systemPrompt || getDynamicPersona();
-        
-        const memoryBlock = userState.memoryArchive.length > 0 ? `\n[Long-term Memory / Previous Context]:\n${userState.memoryArchive.join('\n')}\n` : "";
-        
-        if (!isInternal) { 
-            if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]"; 
-            else if (isChat) { 
-                finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; 
-                finalSystemPrompt += memoryBlock; 
-            } else finalSystemPrompt += `\n${JAILBREAK}`; 
-        }
-        
+        UIManager.setLoadingState(true);
         try {
+            const { isChat = false, mode = "normal", systemPrompt = null } = options; 
+            const isInternal = mode === 'memory_internal';
+            const { apiType, apiKey, baseUrl, model } = this.config; 
+            if (!apiKey) return null;
+            
+            let url = baseUrl.replace(/\/$/, ''); 
+            let finalSystemPrompt = systemPrompt || getDynamicPersona();
+            
+            const memoryBlock = userState.memoryArchive.length > 0 ? `\n[Long-term Memory / Previous Context]:\n${userState.memoryArchive.join('\n')}\n` : "";
+            
+            if (!isInternal) { 
+                if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]"; 
+                else if (isChat) { 
+                    finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; 
+                    finalSystemPrompt += memoryBlock; 
+                } else finalSystemPrompt += `\n${JAILBREAK}`; 
+            }
+            
             let msgs = isChat && !isInternal ? [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }] : [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
             let fetchUrl, fetchBody, fetchHeaders;
             if (apiType === 'openai') {
@@ -308,11 +382,43 @@ export const assistantManager = {
             let reply = apiType === 'openai' ? data.choices?.[0]?.message?.content : data.candidates?.[0]?.content?.parts?.[0]?.text;
             reply = reply?.trim();
             if (isChat && reply && !isInternal) { 
-                // [修复] 此处不再直接 push，交给 addChatMsg 统一处理
                 this.checkAndSummarize(parentWin);
             }
             return reply;
-        } catch(e) { console.error("API Error:", e); return null; }
+        } catch(e) { 
+            console.error("API Error:", e); 
+            return null; 
+        } finally {
+            UIManager.setLoadingState(false);
+        }
+    },
+
+    /**
+     * 手动触发吐槽逻辑
+     */
+    async manualComment() {
+        const context = SillyTavern.getContext();
+        const chat = context.chat || [];
+        if (chat.length === 0) return;
+
+        // 寻找最后一个非用户非系统的消息作为锚点
+        let lastAiMsg = null;
+        for (let i = chat.length - 1; i >= 0; i--) {
+            if (!chat[i].is_user && !chat[i].is_system) {
+                lastAiMsg = chat[i];
+                break;
+            }
+        }
+
+        if (!lastAiMsg) {
+            if (typeof UIManager !== 'undefined' && UIManager.showBubble) {
+                UIManager.showBubble("这里连个能吐槽的人都没有...", "#ff0055");
+            }
+            return;
+        }
+
+        const messageId = lastAiMsg.message_id || lastAiMsg.mesid || chat.indexOf(lastAiMsg);
+        await this.triggerRealtimeComment(messageId);
     },
 
     async triggerRealtimeComment(messageId) {
@@ -377,9 +483,12 @@ Instead of just appending to the end, you should find a contextually relevant po
 [莉莉丝]Your comment text here.
 [Anchor]The exact text from the original message you want to follow.`;
 
+        // 对目标消息也进行预先的内容提取/净化，确保莉莉丝看到的和用户看到的一致
+        const cleanTargetText = extractContent(targetMsg.mes, userState);
+
         const userPrompt = `Target Message to comment on:
 """
-${targetMsg.mes}
+${cleanTargetText}
 """
 
 Current Chat Context:
@@ -390,30 +499,88 @@ ${chatLog}
         try {
             const response = await this.callUniversalAPI(window, userPrompt, { isChat: false, systemPrompt: systemPrompt });
             if (response && response.includes('[莉莉丝]')) {
-                const comment = response.split('[莉莉丝]')[1].split('[Anchor]')[0].trim();
-                const anchorText = response.includes('[Anchor]') ? response.split('[Anchor]')[1].trim() : "";
+                // 1. 更严谨的解析 (按旧脚本逻辑)
+                let cleanCommentContent = "";
+                let anchorText = "";
+                
+                const commentMatch = response.match(/\[莉莉丝\]\s*([\s\S]*?)(?=\[Anchor\]|$)/);
+                if (commentMatch) cleanCommentContent = commentMatch[1].trim();
+                
+                const anchorMatch = response.match(/\[Anchor\]\s*([\s\S]*)/);
+                if (anchorMatch) anchorText = anchorMatch[1].trim();
+
+                // 兜底
+                if (!cleanCommentContent) {
+                    const fallback = response.split('[莉莉丝]')[1] || "";
+                    cleanCommentContent = fallback.split('[Anchor]')[0].trim();
+                }
+
+                const fullCommentTag = `[莉莉丝] ${cleanCommentContent} [/莉莉丝]`;
 
                 const context = SillyTavern.getContext();
                 const chat = context.chat;
                 const msg = chat[targetIndex];
                 
-                if (msg && comment) {
-                    let newContent = msg.mes;
-                    if (anchorText && newContent.includes(anchorText)) {
-                        newContent = newContent.replace(anchorText, `${anchorText}\n\n[莉莉丝] ${comment}`);
-                    } else {
-                        newContent += `\n\n[莉莉丝] ${comment}`;
+                if (msg && cleanCommentContent) {
+                    const msgText = msg.mes;
+                    let targetContent = msgText;
+                    let prefix = "";
+                    let suffix = "";
+
+                    // [同步旧脚本] 提取正文范围逻辑：确保吐槽注入到“正文”范围内，不破坏外层标签
+                    if (userState.extractionEnabled && userState.extractionRegex) {
+                        try {
+                            const pattern = createSmartRegExp(userState.extractionRegex, 's');
+                            const match = pattern.exec(msgText);
+                            if (match) {
+                                const captured = match[1] !== undefined ? match[1] : match[0];
+                                const fullMatch = match[0];
+                                const localStart = fullMatch.indexOf(captured);
+                                
+                                if (localStart !== -1) {
+                                    const globalStart = match.index + localStart;
+                                    const globalEnd = globalStart + captured.length;
+                                    prefix = msgText.substring(0, globalStart);
+                                    targetContent = captured;
+                                    suffix = msgText.substring(globalEnd);
+                                }
+                            }
+                        } catch (e) {
+                             console.error('[Lilith] Injection extraction failed:', e);
+                        }
                     }
+
+                    let newBody = targetContent;
+                    // AI-Driven Anchor Mode
+                    let injected = false;
+                    if (anchorText && targetContent.includes(anchorText)) {
+                        const pos = targetContent.indexOf(anchorText) + anchorText.length;
+                        const subSuffix = targetContent.substring(pos);
+                        // 改为单换行注入，防止 SillyTavern 生成新的 <p> 标签导致包裹失效
+                        newBody = targetContent.substring(0, pos) + 
+                                     "\n" + 
+                                     fullCommentTag + 
+                                     (subSuffix.startsWith('\n') ? "" : "\n") + 
+                                     subSuffix;
+                        injected = true;
+                    }
+
+                    if (!injected) {
+                        newBody = `${targetContent.trimEnd()}\n${fullCommentTag}`;
+                    }
+
+                    msg.mes = prefix + newBody + suffix;
                     
-                    msg.mes = newContent;
-                    // Check if updateMessage exists or just saveChat
+                    // 保存并刷新
                     if (typeof SillyTavern.saveChat === 'function') SillyTavern.saveChat();
-                    
                     context.eventSource.emit(context.event_types.MESSAGE_UPDATED, messageId);
-                    UIManager.showBubble(`刚才吐槽了你一下，哼。`, "#bd00ff");
+                    
+                    if (typeof UIManager !== 'undefined' && UIManager.showBubble) {
+                        UIManager.showBubble(`刚才吐槽了你一下，哼。`, "#bd00ff");
+                    }
                 }
                 
-                AudioSys.speak(comment);
+                AudioSys.speak(cleanCommentContent);
             }
         } catch (e) {
             console.error('[Lilith] Failed to trigger comment:', e);
@@ -425,7 +592,7 @@ ${chatLog}
         if (!toolOutput) return;
         toolOutput.innerHTML = `<div class="scan-line-s"></div><div style="color:var(--l-cyan);">⚡ 正在运行肮脏的协议 [${name}]...</div>`;
 
-        const contextMsg = getPageContext(name === "废物体检报告" ? 100 : 25);
+        const contextMsg = getPageContext(name === "废物体检报告" ? 100 : 25, userState);
         const contextStr = contextMsg.map(m => `[${m.name}]: ${m.message}`).join('\n');
         const safeContext = `[TARGET DATA START]\n${contextStr}\n[TARGET DATA END]`;
 
@@ -722,7 +889,9 @@ ${chatLog}
                             if (Math.random() < 0.1) AudioSys.speak("坏掉了...要坏掉了...哈啊...");
                         }
                     } else if (s < 60) {
-                        if (Math.random() < 0.1) { glitchLayer.style.opacity = '0.3'; glitchLayer.style.background = 'rgba(255,0,0,0.1)'; setTimeout(() => { glitchLayer.style.opacity = '0'; }, 200); }
+                        // 移除全屏粉色闪烁：用户反馈干扰
+                        // if (Math.random() < 0.1) { glitchLayer.style.opacity = '0.3'; glitchLayer.style.background = 'rgba(255,0,0,0.1)'; setTimeout(() => { glitchLayer.style.opacity = '0'; }, 200); }
+                        glitchLayer.style.opacity = '0';
                         glitchLayer.classList.remove('sanity-critical');
                     } else { glitchLayer.style.opacity = '0'; glitchLayer.classList.remove('sanity-critical'); }
                 }
@@ -767,7 +936,16 @@ ${chatLog}
                 if(select) {
                     select.innerHTML = `<option value="">⬇️ 选一个合适的肉体 (${fetchedModels.length})</option>` + fetchedModels.map(m => `<option value="${m}">${m}</option>`).join('');
                     select.style.display = 'block'; 
-                    select.onchange = () => { if(select.value) input.value = select.value; };
+                    select.onchange = () => { 
+                        if(select.value) {
+                            input.value = select.value;
+                            // 立即同步到 runtime config，防止没点保存就切换导致丢失
+                            this.config.model = select.value;
+                            if(typeof userState !== 'undefined' && userState.apiConfig) {
+                                userState.apiConfig.model = select.value;
+                            }
+                        }
+                    };
                 }
                 if(msgBox) msgBox.textContent = "✅ 连接上了";
             } else { if(msgBox) msgBox.textContent = "⚠️ 啥都没有"; }

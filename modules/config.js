@@ -173,9 +173,16 @@ export const DEFAULT_STATE = {
     activePersona: 'toxic',
     hideAvatar: false,
     avatarSize: 150,
+    posLeft: 200,
+    posTop: 20,
+    panelWidth: 360,
+    panelHeight: 520,
     commentMode: 'random', 
     commentFrequency: 30, 
     ttsConfig: { pitch: 1.2, rate: 1.3 },
     extractionEnabled: false,
-    extractionRegex: ''
+    extractionRegex: '',
+    apiConfig: { apiType: 'native', baseUrl: 'https://generativelanguage.googleapis.com', apiKey: '', model: 'gemini-1.5-flash' },
+    apiPresets: [],
+    regexPresets: []
 };

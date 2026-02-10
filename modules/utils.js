@@ -25,6 +25,7 @@ export function createSmartRegExp(input, flags = 's') {
 export function extractContent(text, userState) {
     if (!text) return text;
     let result = text;
+    if (!userState) return result; // 安全检查
 
     if (userState.extractionEnabled && userState.extractionRegex) {
         try {
@@ -48,9 +49,8 @@ export function extractContent(text, userState) {
         }
     }
 
-    if (userState.extractionEnabled || userState.textReplacementEnabled) {
-        result = result.replace(/chatu8/gi, '');
-    }
+    // 内容净化
+    result = result.replace(/chatu8/gi, '');
 
     return result;
 }

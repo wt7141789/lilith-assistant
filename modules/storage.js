@@ -29,56 +29,144 @@ export const panelChatHistory = [];
 
 /**
  * Validates and completes the user state from extension settings.
+ * Now supports per-persona independent storage.
  */
 export function validateState() {
     const settings = getExtensionSettings();
+    console.log('[Lilith] Validating state...', settings);
     
-    // Initialize userState if empty
-    if (!settings.userState) {
-        settings.userState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-    }
-    
-    // Sync shared objects (maintain references)
-    Object.assign(userState, settings.userState);
-    
-    // Sync chat history array
-    panelChatHistory.length = 0;
-    if (settings.chatHistory) {
-        panelChatHistory.push(...settings.chatHistory);
+    // 1. Initialize Global/Management settings
+    if (!settings.global) {
+        console.log('[Lilith] Initializing global settings...');
+        settings.global = {
+            activePersona: DEFAULT_STATE.activePersona || 'toxic',
+            hideAvatar: DEFAULT_STATE.hideAvatar || false,
+            avatarSize: DEFAULT_STATE.avatarSize || 150,
+            commentFrequency: DEFAULT_STATE.commentFrequency || 50,
+            extractionEnabled: DEFAULT_STATE.extractionEnabled || false,
+            extractionRegex: DEFAULT_STATE.extractionRegex || '',
+            textReplacementEnabled: false,
+            textReplacementRegex: '',
+            textReplacementString: '',
+            apiConfig: { ...DEFAULT_STATE.apiConfig },
+            apiPresets: []
+        };
     }
 
-    const fields = [
-        ['fatePoints', 1000],
-        ['gachaInventory', []],
-        ['memoryArchive', []],
-        ['activePersona', 'toxic'],
-        ['hideAvatar', false],
-        ['avatarSize', 150],
-        ['commentMode', 'random'],
-        ['ttsConfig', { pitch: 1.2, rate: 1.3 }],
-        ['commentFrequency', 50],
-        ['extractionEnabled', false],
-        ['extractionRegex', ''],
-        ['textReplacementEnabled', false],
-        ['textReplacementRegex', ''],
-        ['textReplacementString', '']
-    ];
-    fields.forEach(([key, def]) => {
-        if (userState[key] === undefined) userState[key] = def;
-    });
+    if (!settings.global.apiConfig) settings.global.apiConfig = { ...DEFAULT_STATE.apiConfig };
+    if (!settings.global.apiPresets) settings.global.apiPresets = [ ...DEFAULT_STATE.apiPresets ];
+    if (!settings.global.apiPresets) settings.global.apiPresets = [];
+
+    // 2. Initialize Persona Data Map
+    if (!settings.personaData) {
+        console.log('[Lilith] Initializing persona data map...');
+        settings.personaData = {};
+        // Migration: if old userState exists, move it to the current active persona
+        if (settings.userState) {
+            const p = settings.global.activePersona;
+            settings.personaData[p] = JSON.parse(JSON.stringify(settings.userState));
+            delete settings.userState;
+        }
+    }
+
+    // 3. Load Current Persona Data
+    const currentP = settings.global.activePersona;
+    console.log(`[Lilith] Loading persona data for: ${currentP}`);
+    if (!settings.personaData[currentP]) {
+        console.log(`[Lilith] Creating default data for persona: ${currentP}`);
+        settings.personaData[currentP] = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    }
+
+    // 4. Sync to Live State
+    // Reset and Load
+    for (let key in userState) delete userState[key];
+    Object.assign(userState, settings.personaData[currentP]);
+    
+    // Overlay Global Settings (Global takes precedence for UI settings)
+    Object.assign(userState, settings.global);
+    console.log('[Lilith] Current UserState:', userState);
+
+    // 5. Load Chat History
+    panelChatHistory.length = 0;
+    if (settings.personaData[currentP].chatHistory) {
+        panelChatHistory.push(...settings.personaData[currentP].chatHistory);
+        console.log(`[Lilith] Restored ${panelChatHistory.length} messages for ${currentP}`);
+    }
+
+    // Ensure basic numeric fields exist
+    if (userState.favorability === undefined) userState.favorability = 20;
+    if (userState.sanity === undefined) userState.sanity = 80;
+    if (userState.fatePoints === undefined) userState.fatePoints = 1000;
 }
 
 export function saveState(updateUICallback) { 
-    getExtensionSettings().userState = userState; 
+    const settings = getExtensionSettings();
+    const currentP = settings.global?.activePersona || 'toxic';
+
+    console.log(`[Lilith] Saving state for persona: ${currentP}`);
+
+    // Separate Global from Persona data
+    const globalKeys = [
+        'activePersona', 'hideAvatar', 'avatarSize', 'posLeft', 'posTop', 
+        'panelWidth', 'panelHeight', 'commentFrequency', 'commentMode',
+        'extractionEnabled', 'extractionRegex', 'textReplacementEnabled', 
+        'textReplacementRegex', 'textReplacementString', 'apiConfig', 'apiPresets',
+        'regexPresets'
+    ];
+    
+    // 1. Sync per-persona data (Favor, Sanity, Memory, etc.)
+    if (!settings.personaData) settings.personaData = {};
+    if (!settings.personaData[currentP]) settings.personaData[currentP] = {};
+    
+    // Only save persona-relevant keys to personaData
+    for (let key in userState) {
+        if (!globalKeys.includes(key)) {
+            settings.personaData[currentP][key] = userState[key];
+        }
+    }
+    
+    // 2. Sync global data (Settings, Active Persona)
+    if (!settings.global) settings.global = {};
+    globalKeys.forEach(k => {
+        if (userState[k] !== undefined) settings.global[k] = userState[k];
+    });
+
     saveExtensionSettings(); 
     if (updateUICallback) updateUICallback(); 
 }
 
 export function saveChat() {
+    const settings = getExtensionSettings();
+    const currentP = settings.global.activePersona;
+
     if (panelChatHistory.length > 100) {
         panelChatHistory.splice(0, panelChatHistory.length - 100);
     }
-    getExtensionSettings().chatHistory = panelChatHistory;
+    
+    if (!settings.personaData[currentP]) settings.personaData[currentP] = {};
+    settings.personaData[currentP].chatHistory = [...panelChatHistory];
+    
+    saveExtensionSettings();
+}
+
+/**
+ * Switches to a different persona and reloads its specific state.
+ */
+export function switchPersonaState(newPersonaName) {
+    console.log(`[Lilith] Switching persona to: ${newPersonaName}`);
+    const settings = getExtensionSettings();
+    
+    // 1. Save current state first
+    saveState();
+    saveChat();
+
+    // 2. Change active persona in global
+    if (!settings.global) settings.global = {};
+    settings.global.activePersona = newPersonaName;
+    
+    // 3. Re-validate (this will load the new persona's data into userState/panelChatHistory)
+    validateState();
+    
     saveExtensionSettings();
 }
 

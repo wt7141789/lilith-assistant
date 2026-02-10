@@ -1,8 +1,8 @@
 // modules/ui_manager.js
 import { containerId, avatarId, panelId, bubbleId, PERSONA_DB, AvatarPacks, extensionName } from './config.js';
-import { userState, saveState, saveChat, panelChatHistory, updateFavor, updateSanity, getExtensionSettings, saveExtensionSettings } from './storage.js';
+import { userState, saveState, saveChat, panelChatHistory, updateFavor, updateSanity, getExtensionSettings, saveExtensionSettings, switchPersonaState } from './storage.js';
 import { AudioSys } from './audio.js';
-import { createSmartRegExp } from './utils.js';
+import { createSmartRegExp, extractContent } from './utils.js';
 
 export const UIManager = {
     assistant: null, // To be set in index.js to avoid circular dependency
@@ -12,12 +12,17 @@ export const UIManager = {
         const av = document.getElementById(avatarId);
         if (!av) return;
 
+        // 1. 更新当前状态
         if (emotionCmd) { userState.currentFace = emotionCmd; saveState(); }
         const currentEmotionState = userState.currentFace || 'normal';
+        
+        // 2. 获取当前人格的图包 (默认回退到 meme)
         const currentPersona = userState.activePersona || 'meme';
         const pack = AvatarPacks[currentPersona] || AvatarPacks['meme'];
 
+        // 3. 确定表情 Key
         let faceKey = 'normal';
+
         if (currentEmotionState.includes('angry') || currentEmotionState.includes('S:-')) {
             faceKey = 'angry';
         } else if (currentEmotionState.includes('speechless') || currentEmotionState.includes('...')) {
@@ -35,7 +40,11 @@ export const UIManager = {
             else faceKey = 'normal';
         }
 
-        let finalUrl = pack[faceKey] || pack['normal'] || AvatarPacks['meme']['normal'];
+        // 4. 获取最终URL (兜底逻辑)
+        let finalUrl = pack[faceKey];
+        if (!finalUrl) finalUrl = pack['normal']; 
+        if (!finalUrl) finalUrl = AvatarPacks['meme']['normal'];
+
         av.style.backgroundImage = `url('${finalUrl}')`;
         this.updateAvatarStyle();
     },
@@ -46,6 +55,21 @@ export const UIManager = {
         av.style.display = userState.hideAvatar ? 'none' : 'block';
         av.style.width = userState.avatarSize + 'px';
         av.style.height = userState.avatarSize + 'px';
+    },
+
+    setLoadingState(isLoading) {
+        const ring = document.querySelector('.lilith-avatar-ring');
+        const avatar = document.getElementById(avatarId);
+        
+        if (isLoading) {
+            if (ring) ring.classList.add('loading');
+            if (avatar) avatar.classList.add('loading');
+            console.log('[Lilith] AI 开始回复，进度条启动');
+        } else {
+            if (ring) ring.classList.remove('loading');
+            if (avatar) avatar.classList.remove('loading');
+            console.log('[Lilith] AI 回复结束，进度条停止');
+        }
     },
 
     updateAvatarExpression(reply) {
@@ -70,29 +94,27 @@ export const UIManager = {
         
         const wrapper = document.createElement('div'); 
         wrapper.id = containerId; 
-        wrapper.style.left = '100px'; 
-        wrapper.style.top = '100px';
+        wrapper.style.left = (userState.posLeft || 100) + 'px'; 
+        wrapper.style.top = (userState.posTop || 100) + 'px';
+        wrapper.style.width = (userState.panelWidth || 360) + 'px';
         
         const avatar = document.createElement('div'); 
         avatar.id = avatarId;
         const ring = document.createElement('div');
         ring.className = 'lilith-avatar-ring';
         avatar.appendChild(ring);
-        const verTag = document.createElement('div');
-        verTag.className = 'lilith-version-tag';
-        verTag.textContent = 'v2.0.0 PRO';
-        avatar.appendChild(verTag);
         
         const panel = document.createElement('div'); 
         panel.id = panelId; 
         panel.style.display = 'none';
+        panel.style.height = (userState.panelHeight || 520) + 'px';
         
         ['mousedown', 'touchstart', 'click'].forEach(evt => panel.addEventListener(evt, e => e.stopPropagation()));
         
         const muteIcon = AudioSys.muted ? '🔇' : '🔊';
         panel.innerHTML = `
             <div class="lilith-panel-header">
-                <span class="lilith-title">莉莉丝 <span style="font-size:10px; color:var(--l-cyan);">v2.0.0 Final</span></span>
+                <span class="lilith-title">LILITH ASSISTANT <span style="font-size:10px; color:var(--l-cyan);">v2.5.0 PRO</span></span>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span id="lilith-mute-btn" title="语音开关" style="cursor:pointer; font-size:14px;">${muteIcon}</span>
                     <div style="text-align:right; line-height:1;">
@@ -112,14 +134,24 @@ export const UIManager = {
             <div class="lilith-content-area">
                 <div id="page-chat" class="lilith-page active">
                     <div id="lilith-chat-history"></div>
-                    <div class="lilith-input-row">
-                        <button id="lilith-polish-btn" title="润色">🔞</button>
-                        <input type="text" id="lilith-chat-input" placeholder="和${PERSONA_DB[userState.activePersona || 'toxic'].name.split(' ')[1]}说话...">
-                        <button id="lilith-chat-send">▶</button>
+                    <div class="lilith-chat-footer">
+                        <div class="lilith-input-row">
+                            <button id="lilith-manual-comment-chat" title="强制吐槽" style="color:#bd00ff;">
+                                <i class="fa-solid fa-comment-dots"></i>
+                            </button>
+                            <button id="lilith-polish-btn" title="搞颜色/润色" style="color:#ff0055;">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </button>
+                            <input type="text" id="lilith-chat-input" placeholder="和${PERSONA_DB[userState.activePersona || 'toxic'].name.split(' ')[1]}聊天...">
+                            <button id="lilith-chat-send" title="发送">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div id="page-tools" class="lilith-page">
                     <div class="tools-grid">
+                        <button class="tool-btn" id="tool-comment" style="grid-column: span 2; border-color:#bd00ff; color:#bd00ff; font-weight:bold;">💬 强制吐槽 (主线)</button>
                         <button class="tool-btn" id="tool-analyze">🧠 局势嘲讽</button>
                         <button class="tool-btn" id="tool-audit">⚖️ 找茬模式</button>
                         <button class="tool-btn" id="tool-branch" style="grid-column: span 2; border-color:#ffd700;">🔮 恶作剧推演 (我)</button>
@@ -199,12 +231,52 @@ export const UIManager = {
                     </div>
 
                     <div class="cfg-group">
+                        <label style="color:var(--l-gold); font-weight:bold;">🧬 API 预设 (Presets)</label>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <select id="cfg-preset-select" class="lilith-select" style="flex:1; background:#111; color:#fff; border:1px solid var(--l-gold);">
+                                <option value="">-- 选择预设 --</option>
+                                ${(userState.apiPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('')}
+                            </select>
+                            <button id="cfg-preset-delete" class="tool-btn" style="width:30px; border-color:#ff0055;" title="删除当前选中的预设">🗑️</button>
+                        </div>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="cfg-preset-name" placeholder="预设名称..." style="flex:1; font-size:12px; height:24px;">
+                            <button id="cfg-preset-save" class="tool-btn" style="width:60px; border-color:var(--l-gold); font-size:12px;">保存</button>
+                        </div>
+                    </div>
+
+                    <div class="cfg-group" style="border-top: 1px dashed #444; margin-top: 5px; padding-top: 5px;">
+                        <label style="color:var(--l-cyan); font-weight:bold;">🛡️ 正则清理方案 (RegEx)</label>
+                        <div style="display:flex; gap:5px; margin-bottom:5px;">
+                            <select id="cfg-regex-preset-select" class="lilith-select" style="flex:1; background:#111; color:#fff; border:1px solid var(--l-cyan);">
+                                <option value="">-- 选择方案 --</option>
+                                ${(userState.regexPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('')}
+                            </select>
+                            <button id="cfg-regex-delete" class="tool-btn" style="width:30px; border-color:#ff0055;" title="删除当前选中的方案">🗑️</button>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px; font-size:11px; color:#ccc;">
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" id="cfg-extract-enable" ${userState.extractionEnabled ? 'checked' : ''} style="width:auto; margin-right:4px;"> 
+                                <span>提取</span>
+                            </div>
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" id="cfg-repl-enable" ${userState.textReplacementEnabled ? 'checked' : ''} style="width:auto; margin-right:4px;"> 
+                                <span>替换</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="cfg-regex-name" placeholder="方案名称..." style="flex:1; font-size:12px; height:24px;">
+                            <button id="cfg-regex-save" class="tool-btn" style="width:60px; border-color:var(--l-cyan); font-size:12px;">归档</button>
+                        </div>
+                    </div>
+
+                    <div class="cfg-group">
                         <label>大脑皮层 (Model)</label>
                         <div style="display:flex; gap:5px;">
-                            <input type="text" id="cfg-model" value="${(userState.apiConfig && userState.apiConfig.model) || 'gemini-1.5-flash'}" style="flex:1;">
+                            <input type="text" id="cfg-model" value="${(userState.apiConfig && userState.apiConfig.model) || ''}" placeholder="gemini-1.5-flash" style="flex:1;">
                             <button id="cfg-get-models" class="tool-btn" style="width:30px;">↻</button>
                         </div>
-                        <select id="cfg-model-select" style="display:none; margin-top:5px;"></select>
+                        <select id="cfg-model-select" style="display:none; margin-top:5px; background:#111; color:#fff; border:1px solid #444; font-size:12px;"></select>
                     </div>
                     
                     <div class="cfg-group"><label>神经密钥 (API Key)</label><input type="password" id="cfg-key" value="${(userState.apiConfig && userState.apiConfig.apiKey) || ''}"></div>
@@ -227,16 +299,20 @@ export const UIManager = {
                             <span style="font-size:12px; color:#ccc; white-space:nowrap;">球体大小: <span id="cfg-size-val">${userState.avatarSize}</span>px</span>
                             <input type="range" id="cfg-avatar-size" min="50" max="300" step="10" value="${userState.avatarSize}" style="flex:1; accent-color:var(--l-main);" oninput="document.getElementById('cfg-size-val').textContent = this.value">
                         </div>
+                        <button id="cfg-reset-pos" style="width:100%; margin-top:12px; background:rgba(255,255,255,0.05); color:#00f3ff; border:1px solid #00f3ff66; padding:5px; cursor:pointer; font-size:11px; border-radius:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
+                            <i class="fa-solid fa-location-crosshairs"></i> 修正位置偏移
+                        </button>
                     </div>
 
                     <div class="cfg-btns" style="display:flex; gap:5px; margin-top:10px;">
                         <button id="cfg-test" class="tool-btn" style="flex:1; border-color:#00f3ff;">戳一下</button>
-                        <button id="cfg-clear-mem" class="tool-btn" style="flex:1; border-color:#ff0055;">格式化我</button>
-                        <button id="cfg-save" class="tool-btn" style="flex:1; border-color:#0f0;">记住痛楚</button>
+                        <button id="cfg-clear-mem" class="tool-btn" style="flex:1; border-color:#ff0055; color:#ff0055;">格式化</button>
+                        <button id="cfg-save" class="tool-btn" style="flex:1; border-color:#0f0;">保存配置</button>
                     </div>
                     <div id="cfg-msg" style="font-size:10px; color:#aaa; margin-top:5px;"></div>
                 </div>
             </div>
+            <div class="lilith-resize-handle"></div>
         `;
         
         wrapper.appendChild(panel);
@@ -245,6 +321,7 @@ export const UIManager = {
 
         this.bindInternalEvents();
         this.bindDrag();
+        this.bindResize();
         this.updatePos();
     },
 
@@ -285,33 +362,26 @@ export const UIManager = {
         
         const onDown = (e) => {
             isDragging = false; 
-            startX = e.clientX || e.touches[0].clientX; 
-            startY = e.clientY || e.touches[0].clientY;
-            const rect = wrapper.getBoundingClientRect(); 
-            initialLeft = rect.left; 
-            initialTop = rect.top; 
+            const event = e.touches ? e.touches[0] : e;
+            startX = event.clientX; 
+            startY = event.clientY;
+            initialLeft = wrapper.offsetLeft;
+            initialTop = wrapper.offsetTop;
             
             avatar.style.cursor = 'grabbing';
-            avatar.style.transition = 'none';
+            // 保持 CSS transition，实现 1:1 复刻的“弹性拖动”灵敏度
 
             const onMove = (me) => {
-                const cx = me.clientX || (me.touches ? me.touches[0].clientX : 0); 
+                const cx = me.clientX || (me.touches ? me.touches[0].clientX : 0);
                 const cy = me.clientY || (me.touches ? me.touches[0].clientY : 0);
                 
-                if (!isDragging && (Math.abs(cx - startX) > 5 || Math.abs(cy - startY) > 5)) {
+                if (Math.abs(cx - startX) > 5 || Math.abs(cy - startY) > 5) {
                     isDragging = true;
                 }
                 
                 if (isDragging) { 
-                    let newLeft = initialLeft + (cx - startX);
-                    let newTop = initialTop + (cy - startY);
-                    
-                    // 限制在视口内
-                    newLeft = Math.max(0, Math.min(window.innerWidth - wrapper.offsetWidth, newLeft));
-                    newTop = Math.max(0, Math.min(window.innerHeight - 50, newTop));
-
-                    wrapper.style.left = newLeft + 'px'; 
-                    wrapper.style.top = newTop + 'px'; 
+                    wrapper.style.left = (initialLeft + (cx - startX)) + 'px'; 
+                    wrapper.style.top = (initialTop + (cy - startY)) + 'px'; 
                     this.updatePos(); 
                 }
             };
@@ -323,11 +393,13 @@ export const UIManager = {
                 document.removeEventListener('touchend', onUp);
                 
                 avatar.style.cursor = 'move'; 
-                avatar.style.transition = '0.4s';
                 
                 if (!isDragging) {
                     this.togglePanel(); 
                 } else {
+                    // 保存位置
+                    userState.posLeft = parseInt(wrapper.style.left);
+                    userState.posTop = parseInt(wrapper.style.top);
                     saveState();
                 }
                 isDragging = false;
@@ -344,6 +416,70 @@ export const UIManager = {
             e.preventDefault(); 
             onDown(e);
         }, { passive: false });
+        
+        this.updatePos();
+    },
+
+    bindResize() {
+        const wrapper = document.getElementById(containerId);
+        const panel = document.getElementById(panelId);
+        const handle = panel.querySelector('.lilith-resize-handle');
+        if (!wrapper || !panel || !handle) return;
+
+        let isResizing = false, startX, startY, startWidth, startHeight;
+
+        const onDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isResizing = true;
+            const event = e.touches ? e.touches[0] : e;
+            startX = event.clientX;
+            startY = event.clientY;
+            startWidth = wrapper.offsetWidth;
+            startHeight = panel.offsetHeight;
+
+            panel.style.transition = 'none';
+            wrapper.style.transition = 'none';
+
+            const onMove = (me) => {
+                if (!isResizing) return;
+                const ev = me.touches ? me.touches[0] : me;
+                
+                let newWidth = startWidth + (ev.clientX - startX);
+                let newHeight = startHeight + (ev.clientY - startY);
+
+                // 限制最小/最大尺寸
+                newWidth = Math.max(280, Math.min(800, newWidth));
+                newHeight = Math.max(300, Math.min(window.innerHeight - 100, newHeight));
+
+                wrapper.style.width = newWidth + 'px';
+                panel.style.height = newHeight + 'px';
+            };
+
+            const onUp = () => {
+                if (isResizing) {
+                    userState.panelWidth = parseInt(wrapper.style.width);
+                    userState.panelHeight = parseInt(panel.style.height);
+                    saveState();
+                }
+                isResizing = false;
+                panel.style.transition = '0.4s cubic-bezier(0.19, 1, 0.22, 1)';
+                
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('touchend', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('touchend', onUp);
+        };
+
+        handle.addEventListener('mousedown', onDown);
+        handle.addEventListener('touchstart', onDown, { passive: false });
     },
 
     updatePos() {
@@ -352,20 +488,14 @@ export const UIManager = {
         if (!wrapper || !panel) return;
 
         const rect = wrapper.getBoundingClientRect();
-        const centerY = rect.top + rect.height / 2;
-
-        if (rect.left + rect.width / 2 < window.innerWidth / 2) {
-            wrapper.classList.remove('pos-right');
-            wrapper.classList.add('pos-left');
-        } else {
-            wrapper.classList.remove('pos-left');
-            wrapper.classList.add('pos-right');
-        }
-
-        if (centerY > window.innerHeight * 0.6) {
-            wrapper.classList.add('pos-top-align');
-        } else {
-            wrapper.classList.remove('pos-top-align');
+        
+        // 1:1 复刻原脚本逻辑：中心点位置决定面板方位
+        // 如果在左半屏幕，面板类名设为 pos-right (向右开口)
+        panel.className = (rect.left + rect.width / 2) < window.innerWidth / 2 ? 'pos-right' : 'pos-left';
+        
+        // 如果在屏幕下半部，添加 pos-top-align (向上开口)
+        if ((rect.top + rect.height / 2) > window.innerHeight * 0.6) {
+            panel.classList.add('pos-top-align');
         }
     },
 
@@ -409,6 +539,9 @@ export const UIManager = {
         sendBtn?.addEventListener('click', doSend);
         input?.addEventListener('keydown', (e) => { if(e.key === 'Enter') { e.stopPropagation(); doSend(); } });
 
+        // Manual Comment
+        document.getElementById('lilith-manual-comment-chat')?.addEventListener('click', () => assistant.manualComment());
+
         // Polish
         document.getElementById('lilith-polish-btn')?.addEventListener('click', async () => {
             const raw = input.value.trim(); if(!raw) return;
@@ -422,6 +555,7 @@ export const UIManager = {
         });
 
         // Tools
+        document.getElementById('tool-comment')?.addEventListener('click', () => assistant.manualComment());
         document.getElementById('tool-analyze')?.addEventListener('click', () => assistant.runTool(window, "局势嘲讽"));
         document.getElementById('tool-audit')?.addEventListener('click', () => assistant.runTool(window, "找茬模式"));
         document.getElementById('tool-branch')?.addEventListener('click', () => assistant.runTool(window, "恶作剧推演"));
@@ -468,7 +602,11 @@ export const UIManager = {
             const personaSelect = document.getElementById('cfg-persona-select');
             if (personaSelect) {
                 personaSelect.addEventListener('change', () => {
-                    userState.activePersona = personaSelect.value;
+                    const newPersona = personaSelect.value;
+                    
+                    // Switch state and data for the new persona
+                    switchPersonaState(newPersona);
+                    
                     if (PERSONA_DB[userState.activePersona]) {
                          userState.ttsConfig = { ...PERSONA_DB[userState.activePersona].voice };
                          // Update UI sliders
@@ -481,8 +619,11 @@ export const UIManager = {
                          if(pVal) pVal.textContent = userState.ttsConfig.pitch;
                          if(rVal) rVal.textContent = userState.ttsConfig.rate;
                     }
-                    saveState();
+                    saveState(); // Ensure the new persona's default state is saved immediately
                     this.updateUI();
+                    
+                    // Show switch confirmation
+                    this.showBubble(`已同步 ${PERSONA_DB[userState.activePersona].name} 的独立数据空间。`);
                 });
             }
 
@@ -490,6 +631,148 @@ export const UIManager = {
             document.getElementById('cfg-test')?.addEventListener('click', () => {
                 assistant.triggerAvatarGlitch();
                 AudioSys.speak("别戳了，烦不烦？");
+            });
+
+            // API Presets
+            const presetSelect = document.getElementById('cfg-preset-select');
+            if (presetSelect) {
+                presetSelect.addEventListener('change', () => {
+                    const presetName = presetSelect.value;
+                    if (!presetName) return;
+                    assistant.loadPreset(presetName);
+                    // Update UI fields from refreshed userState
+                    if (userState.apiConfig) {
+                        const typeEl = document.getElementById('cfg-type');
+                        const urlEl = document.getElementById('cfg-url');
+                        const keyEl = document.getElementById('cfg-key');
+                        const modelEl = document.getElementById('cfg-model');
+                        if (typeEl) typeEl.value = userState.apiConfig.apiType || 'native';
+                        if (urlEl) urlEl.value = userState.apiConfig.baseUrl || '';
+                        if (keyEl) keyEl.value = userState.apiConfig.apiKey || '';
+                        if (modelEl) modelEl.value = userState.apiConfig.model || '';
+                    }
+
+                    this.showBubble(`已加载 API 预设: ${presetName}`, "var(--l-gold)");
+                });
+            }
+
+            // 正则方案下拉/保存逻辑
+            const regexSelect = document.getElementById('cfg-regex-preset-select');
+            if (regexSelect) {
+                regexSelect.addEventListener('change', () => {
+                    const presetName = regexSelect.value;
+                    if (!presetName) return;
+                    assistant.loadRegexPreset(presetName);
+                    
+                    // 1. 同步侧边栏显示 (关键：侧边栏的Checkbox也要刷)
+                    const stExtractEnable = document.getElementById('lilith-extraction-enabled');
+                    const stExtractRegex = document.getElementById('lilith-extraction-regex');
+                    const stReplEnable = document.getElementById('lilith-text-replacement-enabled');
+                    const stReplRegex = document.getElementById('lilith-text-replacement-regex');
+                    const stReplString = document.getElementById('lilith-text-replacement-string');
+
+                    if(stExtractEnable) stExtractEnable.checked = !!userState.extractionEnabled;
+                    if(stExtractRegex) stExtractRegex.value = userState.extractionRegex || '';
+                    if(stReplEnable) stReplEnable.checked = !!userState.textReplacementEnabled;
+                    if(stReplRegex) stReplRegex.value = userState.textReplacementRegex || '';
+                    if(stReplString) stReplString.value = userState.textReplacementString || '';
+
+                    // 2. 同步侧边栏下拉框本身 (保持UI一致)
+                    const stRegexSelect = document.getElementById('lilith-regex-preset-select');
+                    if (stRegexSelect) stRegexSelect.value = presetName;
+
+                    // 3. 同步面板勾选框 (关键：面板里的也要刷)
+                    const cfgExtractEnable = document.getElementById('cfg-extract-enable');
+                    const cfgReplEnable = document.getElementById('cfg-repl-enable');
+                    if (cfgExtractEnable) cfgExtractEnable.checked = !!userState.extractionEnabled;
+                    if (cfgReplEnable) cfgReplEnable.checked = !!userState.textReplacementEnabled;
+
+                    this.showBubble(`已应用正则方案: ${presetName}`, "var(--l-cyan)");
+                });
+            }
+
+            document.getElementById('cfg-regex-save')?.addEventListener('click', () => {
+                const nameInput = document.getElementById('cfg-regex-name');
+                const name = nameInput?.value.trim();
+                
+                if (!name) {
+                    this.showBubble("请输入方案名称", "#ff0055");
+                    return;
+                }
+                
+                assistant.saveRegexPreset(name);
+                
+                // 刷新下拉框
+                if (regexSelect) {
+                    regexSelect.innerHTML = '<option value="">-- 选择方案 --</option>' + 
+                        (userState.regexPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                }
+                const stRegexSelect = document.getElementById('lilith-regex-preset-select');
+                if (stRegexSelect) {
+                    stRegexSelect.innerHTML = '<option value="">-- 选择方案 --</option>' + 
+                        (userState.regexPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                }
+
+                if (nameInput) nameInput.value = '';
+                this.showBubble(`正则方案 ${name} 已保存`, "var(--l-cyan)");
+            });
+
+            document.getElementById('cfg-regex-delete')?.addEventListener('click', () => {
+                const name = regexSelect?.value;
+                if (!name) return;
+                if (confirm(`确定要从库中删除正则方案 "${name}" 吗？`)) {
+                    assistant.deleteRegexPreset(name);
+                    // 刷新下拉框
+                    const options = '<option value="">-- 选择方案 --</option>' + 
+                        (userState.regexPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                    if (regexSelect) regexSelect.innerHTML = options;
+                    const stRegexSelect = document.getElementById('lilith-regex-preset-select');
+                    if (stRegexSelect) stRegexSelect.innerHTML = options;
+                    
+                    this.showBubble(`已删除方案: ${name}`, "#ff0055");
+                }
+            });
+
+            document.getElementById('cfg-preset-save')?.addEventListener('click', () => {
+                const nameInput = document.getElementById('cfg-preset-name');
+                const name = nameInput?.value.trim();
+                
+                if (!name) {
+                    this.showBubble("请输入预设名称", "#ff0055");
+                    return;
+                }
+                
+                const currentConfig = {
+                    apiType: document.getElementById('cfg-type')?.value || 'native',
+                    baseUrl: document.getElementById('cfg-url')?.value || '',
+                    apiKey: document.getElementById('cfg-key')?.value || '',
+                    model: document.getElementById('cfg-model')?.value || ''
+                };
+                
+                assistant.savePreset(name, currentConfig);
+                
+                // Refresh the select options
+                if (presetSelect) {
+                    presetSelect.innerHTML = '<option value="">-- 选择预设 --</option>' + 
+                        (userState.apiPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                }
+
+                if (nameInput) nameInput.value = ''; // Clear input
+                this.showBubble(`预设 ${name} 已保存`, "var(--l-gold)");
+            });
+
+            document.getElementById('cfg-preset-delete')?.addEventListener('click', () => {
+                const name = presetSelect?.value;
+                if (!name) return;
+                if (confirm(`确定要删除预设 "${name}" 吗？`)) {
+                    assistant.deletePreset(name);
+                    // Refresh the select options
+                    if (presetSelect) {
+                        presetSelect.innerHTML = '<option value="">-- 选择预设 --</option>' + 
+                            (userState.apiPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                    }
+                    this.showBubble(`已删除预设: ${name}`, "#ff0055");
+                }
             });
 
             // Buttons - Clear Mem
@@ -522,8 +805,11 @@ export const UIManager = {
                     model: document.getElementById('cfg-model')?.value || ''
                  };
                  userState.apiConfig = newConfig;
+                 // Ensure the live assistant config is also updated
+                 if (assistant) {
+                    assistant.config = { ...assistant.config, ...newConfig };
+                 }
                  saveState();
-                 assistant.config = { ...assistant.config, ...newConfig };
                  this.showBubble("配置已覆盖由神经中枢...", "#0f0");
             });
 
@@ -533,40 +819,37 @@ export const UIManager = {
 
         bindSharedConfigEvents();
 
-        
-        // Switch Persona
-        const cfgPersona = document.getElementById('cfg-persona-select');
-        if (cfgPersona) {
-            cfgPersona.addEventListener('change', () => {
-                userState.activePersona = cfgPersona.value; // Sync with userState
-                saveState(); // Persist
-                this.updateUI(); // Refresh UI (Avatar look, etc)
-                // Also sync with the Sidebar settings if open
-                const extSelect = document.getElementById('lilith-persona-select');
-                if(extSelect) extSelect.value = cfgPersona.value;
-            });
-        }
-
         // Change Frequency
         const cfgFreq = document.getElementById('cfg-freq');
-        if (cfgFreq) {
-            cfgFreq.addEventListener('input', () => {
-                const val = parseInt(cfgFreq.value);
-                userState.commentFrequency = val;
-                const valDisplay = document.getElementById('cfg-freq-val');
-                if(valDisplay) valDisplay.textContent = val;
-                saveExtensionSettings(); // Sync to storage
-            });
-        }
+        const stFreq = document.getElementById('lilith-comment-frequency');
+        
+        const syncFreq = (val) => {
+            userState.commentFrequency = parseInt(val);
+            if (cfgFreq) cfgFreq.value = val;
+            if (stFreq) stFreq.value = val;
+            const valDisplay = document.getElementById('cfg-freq-val');
+            const stDisplay = document.querySelector('.lilith-comment-frequency-val');
+            if(valDisplay) valDisplay.textContent = val;
+            if(stDisplay) stDisplay.textContent = val;
+            saveExtensionSettings();
+        };
+
+        if (cfgFreq) cfgFreq.addEventListener('input', () => syncFreq(cfgFreq.value));
+        if (stFreq) stFreq.addEventListener('input', () => syncFreq(stFreq.value));
 
         // Comment Mode
         const cfgMode = document.getElementById('cfg-comment-mode');
-        if (cfgMode) {
-             cfgMode.addEventListener('change', () => {
-                  userState.commentMode = cfgMode.value;
-                  saveExtensionSettings();
-             });
-        }
+        const stMode = document.getElementById('lilith-comment-mode');
+
+        const syncMode = (val) => {
+            userState.commentMode = val;
+            if (cfgMode) cfgMode.value = val;
+            if (stMode) stMode.value = val;
+            saveExtensionSettings();
+        };
+
+        if (cfgMode) cfgMode.addEventListener('change', () => syncMode(cfgMode.value));
+        if (stMode) stMode.addEventListener('change', () => syncMode(stMode.value));
 
         // --- TTS Settings ---
         const ttsPitch = document.getElementById('tts-pitch');
@@ -593,26 +876,89 @@ export const UIManager = {
 
         // Change Avatar Size
         const cfgSize = document.getElementById('cfg-avatar-size');
-        if (cfgSize) {
-            cfgSize.addEventListener('input', () => {
-                const val = parseInt(cfgSize.value);
-                userState.avatarSize = val;
-                const valDisplay = document.getElementById('cfg-size-val');
-                if(valDisplay) valDisplay.textContent = val;
-                this.updateAvatarStyle();
-                saveExtensionSettings();
-            });
-        }
+        const stSize = document.getElementById('lilith-avatar-size');
+
+        const syncSize = (val) => {
+            userState.avatarSize = parseInt(val);
+            if (cfgSize) cfgSize.value = val;
+            if (stSize) stSize.value = val;
+            const valDisplay = document.getElementById('cfg-size-val');
+            const stDisplay = document.querySelector('.lilith-avatar-size-val');
+            if(valDisplay) valDisplay.textContent = val;
+            if(stDisplay) stDisplay.textContent = val;
+            this.updateAvatarStyle();
+            saveExtensionSettings();
+        };
+
+        if (cfgSize) cfgSize.addEventListener('input', () => syncSize(cfgSize.value));
+        if (stSize) stSize.addEventListener('input', () => syncSize(stSize.value));
 
         // Toggle Hide Avatar
         const cfgHide = document.getElementById('cfg-hide-avatar');
-        if (cfgHide) {
-            cfgHide.addEventListener('change', () => {
-                userState.hideAvatar = cfgHide.checked;
-                this.updateAvatarStyle();
-                saveExtensionSettings();
-            });
-        }
+        const stHide = document.getElementById('lilith-hide-avatar');
+
+        const syncHide = (checked) => {
+            userState.hideAvatar = checked;
+            if (cfgHide) cfgHide.checked = checked;
+            if (stHide) stHide.checked = checked;
+            this.updateAvatarStyle();
+            saveExtensionSettings();
+        };
+
+        if (cfgHide) cfgHide.addEventListener('change', () => syncHide(cfgHide.checked));
+        if (stHide) stHide.addEventListener('change', () => syncHide(stHide.checked));
+
+        // Sync Extraction & Replacement toggles
+        const cfgExtract = document.getElementById('cfg-extract-enable');
+        const stExtract = document.getElementById('lilith-extraction-enabled');
+        const cfgRepl = document.getElementById('cfg-repl-enable');
+        const stRepl = document.getElementById('lilith-text-replacement-enabled');
+
+        const syncExtract = (checked) => {
+            userState.extractionEnabled = checked;
+            if (cfgExtract) cfgExtract.checked = checked;
+            // 如果是jQuery对象（侧边栏常用），则使用 .prop
+            const $stExtract = $('#lilith-extraction-enabled');
+            if ($stExtract.length) $stExtract.prop('checked', checked);
+            else if (stExtract) stExtract.checked = checked;
+            saveExtensionSettings();
+        };
+
+        const syncRepl = (checked) => {
+            userState.textReplacementEnabled = checked;
+            if (cfgRepl) cfgRepl.checked = checked;
+            const $stRepl = $('#lilith-text-replacement-enabled');
+            if ($stRepl.length) $stRepl.prop('checked', checked);
+            else if (stRepl) stRepl.checked = checked;
+            saveExtensionSettings();
+        };
+
+        if (cfgExtract) cfgExtract.addEventListener('change', () => syncExtract(cfgExtract.checked));
+        if (stExtract) stExtract.addEventListener('change', () => syncExtract(stExtract.checked));
+        if (cfgRepl) cfgRepl.addEventListener('change', () => syncRepl(cfgRepl.checked));
+        if (stRepl) stRepl.addEventListener('change', () => syncRepl(stRepl.checked));
+
+        // Reset Position
+        const cfgResetPos = document.getElementById('cfg-reset-pos');
+        const stResetPos = document.getElementById('lilith-reset-pos');
+
+        const resetPos = () => {
+            const wrapper = document.getElementById(containerId);
+            if (!wrapper) {
+                console.error('[Lilith] Reset failed: Wrapper not found');
+                return;
+            }
+            userState.posTop = 100;
+            userState.posLeft = 100;
+            wrapper.style.top = '100px';
+            wrapper.style.left = '100px';
+            this.updatePos();
+            saveState(); // 使用 saveState 以确保同步到全局设置
+            console.log('[Lilith] Position reset to (100, 100)');
+        };
+
+        if (cfgResetPos) cfgResetPos.onclick = resetPos;
+        if (stResetPos) stResetPos.onclick = resetPos;
         
         // Buttons
         // (Removed duplicate bindings here as they are now handled in bindSharedConfigEvents called above)
@@ -621,8 +967,7 @@ export const UIManager = {
         const personaSelectSidebar = document.getElementById('lilith-persona-select');
         if (personaSelectSidebar) {
             personaSelectSidebar.addEventListener('change', () => {
-                userState.activePersona = personaSelectSidebar.value;
-                saveState();
+                switchPersonaState(personaSelectSidebar.value);
                 this.updateUI();
             });
         }
@@ -663,6 +1008,7 @@ export const UIManager = {
         if (elSan) elSan.textContent = userState.sanity + '%';
         this.setAvatar();
         this.updateTheme();
+        this.restoreChatHistory(panelChatHistory); // Fix: Added missing argument
     },
 
     updateTheme() {
@@ -736,11 +1082,14 @@ export const UIManager = {
             displayTagName = text.replace(/\[[SF]:[+\-]?\d+\]/gi, '').trim();
         }
 
+        // [核心逻辑更新] 无论是用户还是莉莉丝，在保存到面板历史和显示之前，都经过正则优化 (提取正文/替换)
+        const optimizedText = extractContent(displayTagName, userState);
+
         const msgNode = document.createElement('div');
         msgNode.className = `msg ${role}`;
         
         if (role === 'lilith') {
-            const { inner, status, action, speech } = this.parseLilithMsg(displayTagName);
+            const { inner, status, action, speech } = this.parseLilithMsg(optimizedText);
             if (inner || status || (action && action.length > 0)) {
                 msgNode.className += ' complex-msg';
                 let html = '';
@@ -748,21 +1097,21 @@ export const UIManager = {
                 if (inner) html += `<div class="l-inner-thought">💭 ${inner}</div>`;
                 if (action) html += `<div class="l-action-text">* ${action} *</div>`;
                 if (speech || (!inner && !action)) {
-                    html += `<div class="l-speech-text">${speech || displayTagName}</div>`;
+                    html += `<div class="l-speech-text">${speech || optimizedText}</div>`;
                 }
                 msgNode.innerHTML = html;
             } else {
-                msgNode.textContent = displayTagName;
+                msgNode.textContent = optimizedText;
             }
         } else {
-            msgNode.textContent = text;
+            msgNode.textContent = optimizedText;
         }
 
         div.appendChild(msgNode);
         div.scrollTop = div.scrollHeight;
 
         if (save) {
-            panelChatHistory.push({ role: role, content: text });
+            panelChatHistory.push({ role: role, content: optimizedText });
             saveChat();
         }
     },
@@ -785,6 +1134,72 @@ export const UIManager = {
             $mode.val(userState.commentMode || 'random');
             $hideAvatar.prop('checked', userState.hideAvatar);
             $avatarSize.val(userState.avatarSize || 150);
+
+            // [新增] 正则方案联动绑定
+            const $regexSelect = $('#lilith-regex-preset-select');
+            const $regexSave = $('#lilith-regex-save');
+            const $regexDelete = $('#lilith-regex-delete');
+            const $regexNewNameInput = $('#lilith-regex-new-name');
+            const $regexNameContainer = $('#lilith-regex-name-container');
+
+            const refreshRegexDropdowns = () => {
+                const options = '<option value="">-- 选择方案 --</option>' + 
+                                (userState.regexPresets || []).map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                $regexSelect.html(options);
+                const cfgRegexSelect = document.getElementById('cfg-regex-preset-select');
+                if (cfgRegexSelect) cfgRegexSelect.innerHTML = options;
+            };
+            refreshRegexDropdowns();
+
+            $regexSelect.on('change', (e) => {
+                const name = $(e.target).val();
+                if (!name) return;
+                assistant.loadRegexPreset(name);
+                
+                // 1. 同步侧边栏所有输入框和勾选框
+                $('#lilith-extraction-enabled').prop('checked', !!userState.extractionEnabled);
+                $('#lilith-extraction-regex').val(userState.extractionRegex || '');
+                $('#lilith-text-replacement-enabled').prop('checked', !!userState.textReplacementEnabled);
+                $('#lilith-text-replacement-regex').val(userState.textReplacementRegex || '');
+                $('#lilith-text-replacement-string').val(userState.textReplacementString || '');
+                
+                // 2. 同步悬浮窗勾选框 (关键：之前的代码漏了这里)
+                const cfgExtractEnable = document.getElementById('cfg-extract-enable');
+                const cfgReplEnable = document.getElementById('cfg-repl-enable');
+                if (cfgExtractEnable) cfgExtractEnable.checked = !!userState.extractionEnabled;
+                if (cfgReplEnable) cfgReplEnable.checked = !!userState.textReplacementEnabled;
+                
+                // 3. 同步悬浮窗下拉
+                const cfgRegexSelect = document.getElementById('cfg-regex-preset-select');
+                if (cfgRegexSelect) cfgRegexSelect.value = name;
+
+                this.showBubble(`已应用正则方案: ${name}`, "var(--l-cyan)");
+            });
+
+            $regexSave.on('click', () => {
+                if ($regexNameContainer.is(':visible')) {
+                    const name = $regexNewNameInput.val().trim();
+                    if (!name) return;
+                    assistant.saveRegexPreset(name);
+                    $regexNewNameInput.val('');
+                    $regexNameContainer.hide();
+                    refreshRegexDropdowns();
+                    this.showBubble(`正则方案 ${name} 已保存`);
+                } else {
+                    $regexNameContainer.show();
+                    $regexNewNameInput.focus();
+                }
+            });
+
+            $regexDelete.on('click', () => {
+                const name = $regexSelect.val();
+                if (!name) return;
+                if (confirm(`确定要从库中删除正则方案 "${name}" 吗？`)) {
+                    assistant.deleteRegexPreset(name);
+                    refreshRegexDropdowns();
+                    this.showBubble(`已删除方案: ${name}`, "#ff0055");
+                }
+            });
 
             // [新增] 正文提取 UI 绑定
             const $extractEnable = $('#lilith-extraction-enabled');
@@ -933,15 +1348,42 @@ export const UIManager = {
                 this.togglePanel();
             });
 
+            $('#lilith-manual-comment').on('click', () => {
+                assistant.manualComment();
+            });
+
+            $('#lilith-reset-pos').on('click', () => {
+                const wrapper = document.getElementById(containerId);
+                if (wrapper) {
+                    userState.posTop = 100;
+                    userState.posLeft = 100;
+                    wrapper.style.top = '100px';
+                    wrapper.style.left = '100px';
+                    this.updatePos();
+                    saveState();
+                    this.showBubble("看板娘已重置到初始位置 (100, 100)");
+                }
+            });
+
             $('#lilith-reset-state').on('click', () => {
-                if (confirm('确定要重置莉莉丝的状态吗？这会清空好感度与记忆。')) {
+                if (confirm('确定要重置莉莉丝的状态吗？这会清空好感度与记忆（仅限当前选中人格）。')) {
                     userState.favorability = 20;
                     userState.sanity = 80;
                     userState.fatePoints = 1000;
                     userState.gachaInventory = [];
+                    userState.memoryArchive = [];
+                    
+                    // 清除对话历史
+                    panelChatHistory.length = 0;
+                    saveChat();
+                    const chatHistoryDiv = document.getElementById('lilith-chat-history');
+                    if (chatHistoryDiv) chatHistoryDiv.innerHTML = '';
+
+                    // 持久化保存
+                    saveState();
                     this.updateUI();
-                    saveExtensionSettings();
-                    alert('状态已重置');
+                    this.renderMemoryUI();
+                    alert('当前人格状态已重置');
                 }
             });
 
@@ -1016,24 +1458,63 @@ export const UIManager = {
                 if (commentText !== null) break;
                 if (child.nodeType === 3) {
                     const text = child.nodeValue;
-                    const marker = '[莉莉丝]';
-                    if (text && text.includes(marker)) {
-                        const idx = text.indexOf(marker);
+                    const startMarker = '[莉莉丝]';
+                    const endMarker = '[/莉莉丝]';
+                    if (text && text.includes(startMarker)) {
+                        const idx = text.indexOf(startMarker);
                         const before = text.slice(0, idx);
-                        const after = text.slice(idx + marker.length);
+                        const rest = text.slice(idx + startMarker.length);
                         child.nodeValue = before;
-                        let collected = after;
-                        let next = child.nextSibling;
-                        while (next) {
-                            let nextToProcess = next.nextSibling;
-                            if (next.nodeType === 3) collected += next.nodeValue;
-                            else if (next.nodeType === 1) {
-                                if (next.tagName === 'BR') collected += '\n';
-                                else collected += next.innerText || next.textContent;
+                        
+                        let collected = "";
+                        let hasClosing = false;
+                        
+                        // 检查初始片段是否包含闭合标记
+                        if (rest.includes(endMarker)) {
+                            const endIdx = rest.indexOf(endMarker);
+                            collected = rest.slice(0, endIdx);
+                            const suffix = rest.slice(endIdx + endMarker.length);
+                            const suffixNode = document.createTextNode(suffix);
+                            if (child.parentNode) child.parentNode.insertBefore(suffixNode, child.nextSibling);
+                            hasClosing = true;
+                        } else {
+                            collected = rest;
+                            let next = child.nextSibling;
+                            while (next) {
+                                if (next.nodeType === 3) {
+                                    const val = next.nodeValue;
+                                    if (val.includes(endMarker)) {
+                                        const parts = val.split(endMarker);
+                                        collected += parts[0];
+                                        next.nodeValue = parts.slice(1).join(endMarker); 
+                                        hasClosing = true;
+                                        break;
+                                    }
+                                    if (val.includes('\n\n')) {
+                                        const parts = val.split('\n\n');
+                                        collected += parts[0];
+                                        break; 
+                                    }
+                                    collected += val;
+                                } else if (next.nodeType === 1) {
+                                    if (next.tagName === 'BR') collected += '\n';
+                                    else {
+                                        const htmlContent = next.outerHTML || next.textContent;
+                                        if (htmlContent.includes(endMarker)) {
+                                            const parts = htmlContent.split(endMarker);
+                                            collected += parts[0];
+                                            hasClosing = true;
+                                            break;
+                                        }
+                                        collected += htmlContent;
+                                    }
+                                }
+                                let nextToProcess = next.nextSibling;
+                                next.remove();
+                                next = nextToProcess;
                             }
-                            next.remove();
-                            next = nextToProcess;
                         }
+                        
                         commentText = collected.trim();
                         insertAfterNode = child;
                         hasModified = true;
@@ -1072,8 +1553,19 @@ export const UIManager = {
                      </div>`;
             html += '</div></div>';
 
-            if (insertAfterNode) $(insertAfterNode).after(html);
-            else mesText.append(html);
+            let targetToInsert = insertAfterNode;
+            
+            // 如果父节点是段落或其它块元素，则把卡片插在块级元素之后，防止样式嵌套导致的包裹感缺失
+            const parent = insertAfterNode.parentElement;
+            if (parent && parent !== mesText[0] && !['SPAN', 'B', 'I', 'STRONG', 'EM'].includes(parent.tagName)) {
+                targetToInsert = parent;
+            }
+
+            if (targetToInsert) {
+                $(targetToInsert).after(html);
+            } else {
+                mesText.append(html);
+            }
         }
     }
 };
