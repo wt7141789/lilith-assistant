@@ -95,9 +95,25 @@ export const assistantManager = {
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
             nativeInputValueSetter.call(input, text);
             input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            
             if (autoSend) {
-                const btn = parentWin.document.getElementById('send_but');
-                if (btn) btn.click();
+                setTimeout(() => {
+                    const btn = parentWin.document.getElementById('send_but');
+                    if (btn) {
+                        btn.click();
+                    } else {
+                        // 备选方案：通过回车触发
+                        const event = new KeyboardEvent('keydown', {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true
+                        });
+                        input.dispatchEvent(event);
+                    }
+                }, 50);
             }
         }
     },

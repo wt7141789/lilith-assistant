@@ -310,7 +310,7 @@ export const UIManager = {
                             </div>
                             <div style="display:flex; align-items:center;">
                                 <input type="checkbox" id="cfg-auto-send" ${userState.autoSend !== false ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
-                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-auto-send').click()">自动发送工具</span>
+                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-auto-send').click()">自动发送选择</span>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
