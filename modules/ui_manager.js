@@ -434,12 +434,17 @@ export const UIManager = {
         // 头像拖动
         avatar.addEventListener('mousedown', onDown); 
         avatar.addEventListener('touchstart', (e) => {
+            if (e.cancelable) e.preventDefault(); // 阻止手机端发出"虚拟鼠标"点击事件，防止触发两次 toggle
             onDown(e);
         }, { passive: false });
 
         // 面板整体拖动
         panel.addEventListener('mousedown', onDown);
         panel.addEventListener('touchstart', (e) => {
+            // 只有点击面板 header 或背景时才阻止默认
+            if (e.target.closest('.lilith-panel-header') || e.target === panel) {
+                if (e.cancelable) e.preventDefault();
+            }
             onDown(e);
         }, { passive: false });
         
