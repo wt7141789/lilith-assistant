@@ -361,6 +361,8 @@ export const UIManager = {
         let isDragging = false, startX, startY, initialLeft, initialTop;
         
         const onDown = (e) => {
+            const currentTrigger = e.currentTarget; // 关键：提前捕获当前触发元素
+
             // 如果点击的是输入框、按钮、滚动区域或特定交互区域，则不触发拖动
             const interactiveTags = ['INPUT', 'BUTTON', 'SELECT', 'I', 'A', 'TEXTAREA'];
             if (interactiveTags.includes(e.target.tagName) || 
@@ -411,7 +413,7 @@ export const UIManager = {
                 
                 if (!isDragging) {
                     // 如果是在头像上点的且没拖动，则触发显示/隐藏
-                    if (e.currentTarget === avatar) {
+                    if (currentTrigger === avatar) {
                         this.togglePanel(); 
                     }
                 } else {
