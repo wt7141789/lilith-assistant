@@ -171,17 +171,21 @@ div.lilith-chat-ui:hover {
 
 /* 悬浮助手样式更新 */
 #lilith-wrapper-cn { 
-    position: fixed; z-index: 99999; display: flex; flex-direction: column; align-items: center; 
-    min-width: 90px; font-family: var(--l-font); letter-spacing: 0.5px; pointer-events: none; 
+    position: fixed; z-index: 99999; 
+    width: 90px; /* 初始值，由 JS 覆盖 */
+    height: 90px; /* 初始值，由 JS 覆盖 */
+    font-family: var(--l-font); letter-spacing: 0.5px; 
+    pointer-events: none; 
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 
 #lilith-avatar-cn { 
-    order: -1; position: relative; z-index: 20; width: 90px; height: 90px; 
+    position: relative; z-index: 20; width: 100%; height: 100%; 
     background-size: cover; background-position: center;
     border-radius: 50%; 
     border: 2px solid var(--l-main); 
     box-shadow: 0 0 15px var(--l-main), inset 0 0 10px rgba(0,0,0,0.5); 
-    cursor: move; transition: 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
+    cursor: move; transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
     pointer-events: auto;
     touch-action: none;
     animation: pulse-glow 5s infinite ease-in-out;
@@ -281,12 +285,13 @@ div.lilith-chat-ui:hover {
 
 #lilith-panel-cn { 
     position: absolute;
-    top: 45px;
-    left: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, 0) scale(0.9);
     z-index: 5;
-    width: 100%; 
+    width: 360px; 
     height: 520px; /* 由 JS 动态控制，这里作为兜底 */
-    max-height: 90vh; 
+    max-height: 85vh; 
     background: var(--l-bg); 
     border: 1px solid #444; 
     border-top: 2px solid var(--l-main); 
@@ -299,38 +304,17 @@ div.lilith-chat-ui:hover {
     pointer-events: auto;
     /* 初始状态用于动画 */
     opacity: 0;
-    transform: translateY(-10px) scale(0.9);
-    pointer-events: none;
     visibility: hidden;
 }
 
 /* 缩放手柄 */
 .lilith-resize-handle {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    cursor: nwse-resize;
-    z-index: 101;
-    background: linear-gradient(135deg, 
-        transparent 0%, transparent 50%, 
-        var(--l-main) 50%, var(--l-main) 60%, 
-        transparent 60%, transparent 70%, 
-        var(--l-main) 70%, var(--l-main) 80%, 
-        transparent 80%, transparent 90%, 
-        var(--l-main) 90%, var(--l-main) 100%
-    );
-    opacity: 0.5;
-    transition: opacity 0.2s;
-}
-.lilith-resize-handle:hover {
-    opacity: 1;
+/* Lines 312-335 omitted */
 }
 
 #lilith-panel-cn.active {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translate(-50%, 45px) scale(1);
     pointer-events: auto;
     visibility: visible;
 }
@@ -340,17 +324,16 @@ div.lilith-chat-ui:hover {
 
 #lilith-wrapper-cn:has(.pos-top-align) #lilith-panel-cn {
     top: auto;
-    bottom: 45px;
+    bottom: 50%;
     border-top: 1px solid #444;
     border-bottom: 2px solid var(--l-main);
     clip-path: polygon(0 2%, 5% 0, 95% 0, 100% 2%, 100% 100%, 0 100%);
     padding-top: 0;
     padding-bottom: 50px;
-    transform: translateY(10px) scale(0.9);
 }
 
 #lilith-wrapper-cn:has(.pos-top-align) #lilith-panel-cn.active {
-    transform: translateY(0) scale(1);
+    transform: translate(-50%, -45px) scale(1);
 }
 
 .lilith-panel-header { 

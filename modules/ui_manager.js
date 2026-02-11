@@ -51,10 +51,16 @@ export const UIManager = {
 
     updateAvatarStyle() {
         const av = document.getElementById(avatarId);
+        const wrapper = document.getElementById(containerId);
         if (!av) return;
         av.style.display = userState.hideAvatar ? 'none' : 'block';
         av.style.width = userState.avatarSize + 'px';
         av.style.height = userState.avatarSize + 'px';
+        
+        if (wrapper) {
+            wrapper.style.width = userState.avatarSize + 'px';
+            wrapper.style.height = userState.avatarSize + 'px';
+        }
     },
 
     setLoadingState(isLoading) {
@@ -96,7 +102,9 @@ export const UIManager = {
         wrapper.id = containerId; 
         wrapper.style.left = (userState.posLeft || 100) + 'px'; 
         wrapper.style.top = (userState.posTop || 100) + 'px';
-        wrapper.style.width = (userState.panelWidth || 360) + 'px';
+        // 移除固定的 360px 宽度，让 wrapper 紧贴头像，避免手机端布局挤压
+        wrapper.style.width = (userState.avatarSize || 90) + 'px';
+        wrapper.style.height = (userState.avatarSize || 90) + 'px';
         
         const avatar = document.createElement('div'); 
         avatar.id = avatarId;
