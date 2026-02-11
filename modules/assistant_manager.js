@@ -687,9 +687,9 @@ ${chatLog}
                     if (tag.includes("上策")) { cost = -50; colorStyle = "border-color: #00f3ff; background: rgba(0,243,255,0.1);"; tagDisplay += " (-50FP)"; }
                     else if (tag.includes("中策")) { cost = -25; colorStyle = "border-color: #00ff00; background: rgba(0,255,0,0.1);"; tagDisplay += " (-25FP)"; }
                     else if (tag.includes("下策")) { cost = 10; colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);"; tagDisplay += " (+10FP)"; }
-                } else {
-                    if (tag.includes("作死") || tag.includes("Risk") || tag.includes("色")) colorStyle = "border-color: #ff0055; background: rgba(255,0,85,0.1);";
-                    else if (tag.includes("奇怪")) colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);";
+                } else if (name === "恶作剧推演") {
+                    if (tag.includes("作死") || tag.includes("R18") || tag.includes("色")) colorStyle = "border-color: #ff0055; background: rgba(255,0,85,0.1);";
+                    else if (tag.includes("变态") || tag.includes("奇怪")) colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);";
                 }
 
                 const card = document.createElement('div');
@@ -699,17 +699,31 @@ ${chatLog}
 
                 card.onclick = () => {
                     card.style.opacity = '0.5'; card.style.transform = 'scale(0.98)';
+                    const isAutoSend = userState.autoSend !== false;
+                    
                     if (cost !== 0) {
                         userState.fatePoints += cost;
                         saveState();
-                        const payload = `${content} | /setvar key=fate_points value=${userState.fatePoints}`;
-                        this.sendToSillyTavern(parentWin, payload, false);
-                        UIManager.showBubble(`已填入 (FP变动: ${cost})`);
+                        
+                        let finalContent = content;
+                        if (isAutoSend) {
+                            // 自动发送模式下：去掉可能存在的 | 引导的代码，防止泄露脚本
+                            finalContent = content.split('|')[0].trim();
+                        } else {
+                            // 填入模式下：保留脚本以同步 ST 变量
+                            finalContent = `${content} | /setvar key=fate_points value=${userState.fatePoints}`;
+                        }
+                        
+                        this.sendToSillyTavern(parentWin, finalContent, isAutoSend);
+                        UIManager.showBubble(isAutoSend ? `已发送 (FP: ${cost > 0 ? '+' : ''}${cost})` : `已填入 (FP: ${cost > 0 ? '+' : ''}${cost})`);
+                        
                         const fpEl = document.getElementById('gacha-fp-val');
                         if (fpEl) fpEl.textContent = userState.fatePoints;
                     } else {
-                        this.sendToSillyTavern(parentWin, content, false);
-                        UIManager.showBubble(`已填入：[${tag}] 路线`);
+                        // 恶作剧推演等无费用工具
+                        const finalContent = isAutoSend ? content.split('|')[0].trim() : content;
+                        this.sendToSillyTavern(parentWin, finalContent, isAutoSend);
+                        UIManager.showBubble(isAutoSend ? `已执行：[${tag}] 路线` : `已填入：[${tag}] 路线`);
                     }
                 };
                 container.appendChild(card);

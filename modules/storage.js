@@ -43,6 +43,7 @@ export function validateState() {
             hideAvatar: DEFAULT_STATE.hideAvatar || false,
             avatarSize: DEFAULT_STATE.avatarSize || 150,
             commentFrequency: DEFAULT_STATE.commentFrequency || 50,
+            autoSend: (settings.global && settings.global.autoSend !== undefined) ? settings.global.autoSend : true,
             extractionEnabled: DEFAULT_STATE.extractionEnabled || false,
             extractionRegex: DEFAULT_STATE.extractionRegex || '',
             textReplacementEnabled: false,

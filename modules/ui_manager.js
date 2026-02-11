@@ -302,10 +302,16 @@ export const UIManager = {
                     </div>
                     
                     <div class="cfg-group" style="border-top:1px dashed #444; margin-top:10px; padding-top:10px;">
-                        <label style="color:var(--l-cyan); font-weight:bold; margin-bottom:5px;">外观设定</label>
-                        <div style="display:flex; align-items:center; margin-bottom:5px;">
-                            <input type="checkbox" id="cfg-hide-avatar" ${userState.hideAvatar ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
-                            <span style="font-size:12px; color:#ccc;">隐藏悬浮球 (仅保留面板)</span>
+                        <label style="color:var(--l-cyan); font-weight:bold; margin-bottom:5px;">偏好与外观</label>
+                        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" id="cfg-hide-avatar" ${userState.hideAvatar ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
+                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-hide-avatar').click()">隐藏悬浮球</span>
+                            </div>
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" id="cfg-auto-send" ${userState.autoSend !== false ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
+                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-auto-send').click()">自动发送工具</span>
+                            </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span style="font-size:12px; color:#ccc; white-space:nowrap;">球体大小: <span id="cfg-size-val">${userState.avatarSize}</span>px</span>
@@ -961,6 +967,20 @@ export const UIManager = {
         if (cfgHide) cfgHide.addEventListener('change', () => syncHide(cfgHide.checked));
         if (stHide) stHide.addEventListener('change', () => syncHide(stHide.checked));
 
+        // Sync Auto Send
+        const cfgAutoSend = document.getElementById('cfg-auto-send');
+        const stAutoSend = document.getElementById('lilith-auto-send');
+        const syncAutoSend = (checked) => {
+            userState.autoSend = checked;
+            if (cfgAutoSend) cfgAutoSend.checked = checked;
+            const $stAutoSend = $('#lilith-auto-send');
+            if ($stAutoSend.length) $stAutoSend.prop('checked', checked);
+            else if (stAutoSend) stAutoSend.checked = checked;
+            saveExtensionSettings();
+        };
+        if (cfgAutoSend) cfgAutoSend.addEventListener('change', () => syncAutoSend(cfgAutoSend.checked));
+        if (stAutoSend) stAutoSend.addEventListener('change', () => syncAutoSend(stAutoSend.checked));
+
         // Sync Extraction & Replacement toggles
         const cfgExtract = document.getElementById('cfg-extract-enable');
         const stExtract = document.getElementById('lilith-extraction-enabled');
@@ -1180,12 +1200,14 @@ export const UIManager = {
             const $freqVal = $('#lilith-freq-value');
             const $mode = $('#lilith-comment-mode');
             const $hideAvatar = $('#lilith-hide-avatar');
+            const $autoSend = $('#lilith-auto-send');
             const $avatarSize = $('#lilith-avatar-size');
 
             $freq.val(userState.commentFrequency || 0);
             $freqVal.text(`${userState.commentFrequency || 0}%`);
             $mode.val(userState.commentMode || 'random');
             $hideAvatar.prop('checked', userState.hideAvatar);
+            $autoSend.prop('checked', userState.autoSend !== false);
             $avatarSize.val(userState.avatarSize || 150);
 
             // [新增] 更新逻辑重构
@@ -1435,6 +1457,16 @@ export const UIManager = {
                 // [Sync] Update Floating Panel
                 const cfgHide = document.getElementById('cfg-hide-avatar');
                 if(cfgHide) cfgHide.checked = userState.hideAvatar;
+
+                saveExtensionSettings();
+            });
+
+            $autoSend.on('change', (e) => {
+                userState.autoSend = $(e.target).prop('checked');
+                
+                // [Sync] Update Floating Panel
+                const cfgAuto = document.getElementById('cfg-auto-send');
+                if(cfgAuto) cfgAuto.checked = userState.autoSend;
 
                 saveExtensionSettings();
             });

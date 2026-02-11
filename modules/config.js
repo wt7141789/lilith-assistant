@@ -177,6 +177,7 @@ export const DEFAULT_STATE = {
     posTop: 20,
     panelWidth: 360,
     panelHeight: 520,
+    autoSend: true,
     commentMode: 'random', 
     commentFrequency: 30, 
     ttsConfig: { pitch: 1.2, rate: 1.3 },
