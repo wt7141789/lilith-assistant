@@ -125,7 +125,7 @@ export const UIManager = {
         const muteIcon = AudioSys.muted ? '🔇' : '🔊';
         panel.innerHTML = `
             <div class="lilith-panel-header">
-                <span class="lilith-title">LILITH ASSISTANT <span style="font-size:10px; color:var(--l-cyan);">v2.5.0 PRO</span></span>
+                <span class="lilith-title">LILITH ASSISTANT <span style="font-size:10px; color:var(--l-cyan);">v2.5.9 PRO</span></span>
                 <div style="display:flex; align-items:center; gap:10px;">
                     <span id="lilith-mute-btn" title="语音开关" style="cursor:pointer; font-size:14px;">${muteIcon}</span>
                     <div style="text-align:right; line-height:1;">
