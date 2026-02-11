@@ -172,14 +172,14 @@ div.lilith-chat-ui:hover {
 /* 悬浮助手样式更新 */
 :root {
     --l-avatar-size: 90px;
-    --l-panel-offset: 45px;
+    --l-panel-offset: 100px;
     --l-panel-max-height: 90vh;
 }
 
 @media screen and (max-width: 600px) {
     :root {
         --l-avatar-size: 70px;
-        --l-panel-offset: 35px;
+        --l-panel-offset: 80px;
         --l-panel-max-height: 75vh;
     }
 }
@@ -190,7 +190,7 @@ div.lilith-chat-ui:hover {
 }
 
 #lilith-avatar-cn { 
-    order: -1; position: relative; z-index: 10; 
+    order: -1; position: relative; z-index: 50; 
     width: var(--l-avatar-size); height: var(--l-avatar-size); 
     background-size: cover; background-position: center;
     border-radius: 50%; 
