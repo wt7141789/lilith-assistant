@@ -51,16 +51,10 @@ export const UIManager = {
 
     updateAvatarStyle() {
         const av = document.getElementById(avatarId);
-        const wrapper = document.getElementById(containerId);
         if (!av) return;
         av.style.display = userState.hideAvatar ? 'none' : 'block';
         av.style.width = userState.avatarSize + 'px';
         av.style.height = userState.avatarSize + 'px';
-        
-        if (wrapper) {
-            wrapper.style.width = userState.avatarSize + 'px';
-            wrapper.style.height = userState.avatarSize + 'px';
-        }
     },
 
     setLoadingState(isLoading) {
@@ -102,9 +96,7 @@ export const UIManager = {
         wrapper.id = containerId; 
         wrapper.style.left = (userState.posLeft || 100) + 'px'; 
         wrapper.style.top = (userState.posTop || 100) + 'px';
-        // 移除固定的 360px 宽度，让 wrapper 紧贴头像，避免手机端布局挤压
-        wrapper.style.width = (userState.avatarSize || 90) + 'px';
-        wrapper.style.height = (userState.avatarSize || 90) + 'px';
+        wrapper.style.width = (userState.panelWidth || 360) + 'px';
         
         const avatar = document.createElement('div'); 
         avatar.id = avatarId;
@@ -363,11 +355,24 @@ export const UIManager = {
     bindDrag() {
         const wrapper = document.getElementById(containerId);
         const avatar = document.getElementById(avatarId);
-        if (!wrapper || !avatar) return;
+        const panel = document.getElementById(panelId);
+        if (!wrapper || !avatar || !panel) return;
 
         let isDragging = false, startX, startY, initialLeft, initialTop;
         
         const onDown = (e) => {
+            // 如果点击的是输入框、按钮、滚动区域或特定交互区域，则不触发拖动
+            const interactiveTags = ['INPUT', 'BUTTON', 'SELECT', 'I', 'A', 'TEXTAREA'];
+            if (interactiveTags.includes(e.target.tagName) || 
+                e.target.closest('#lilith-chat-history') ||
+                e.target.closest('.lilith-page') && e.target.closest('.lilith-page').scrollHeight > e.target.closest('.lilith-page').clientHeight ||
+                e.target.closest('.lilith-chat-footer') || 
+                e.target.closest('.lilith-resize-handle') ||
+                e.target.closest('.cfg-group')) {
+                // 特例：如果是 header，即便在页面内也允许拖动
+                if (!e.target.closest('.lilith-panel-header')) return;
+            }
+
             isDragging = false; 
             const event = e.touches ? e.touches[0] : e;
             startX = event.clientX; 
@@ -375,8 +380,9 @@ export const UIManager = {
             initialLeft = wrapper.offsetLeft;
             initialTop = wrapper.offsetTop;
             
+            wrapper.style.transition = 'none'; // 拖动时禁用平滑动画提高响应速度
             avatar.style.cursor = 'grabbing';
-            // 保持 CSS transition，实现 1:1 复刻的“弹性拖动”灵敏度
+            panel.style.cursor = 'grabbing';
 
             const onMove = (me) => {
                 const cx = me.clientX || (me.touches ? me.touches[0].clientX : 0);
@@ -399,10 +405,15 @@ export const UIManager = {
                 document.removeEventListener('touchmove', onMove); 
                 document.removeEventListener('touchend', onUp);
                 
+                wrapper.style.transition = ''; 
                 avatar.style.cursor = 'move'; 
+                panel.style.cursor = '';
                 
                 if (!isDragging) {
-                    this.togglePanel(); 
+                    // 如果是在头像上点的且没拖动，则触发显示/隐藏
+                    if (e.currentTarget === avatar) {
+                        this.togglePanel(); 
+                    }
                 } else {
                     // 保存位置
                     userState.posLeft = parseInt(wrapper.style.left);
@@ -418,9 +429,15 @@ export const UIManager = {
             document.addEventListener('touchend', onUp);
         };
 
+        // 头像拖动
         avatar.addEventListener('mousedown', onDown); 
         avatar.addEventListener('touchstart', (e) => {
-            e.preventDefault(); 
+            onDown(e);
+        }, { passive: false });
+
+        // 面板整体拖动
+        panel.addEventListener('mousedown', onDown);
+        panel.addEventListener('touchstart', (e) => {
             onDown(e);
         }, { passive: false });
         
