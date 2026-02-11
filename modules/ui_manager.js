@@ -1386,13 +1386,8 @@ export const UIManager = {
                 $icon.removeClass('fa-spin');
                 
                 if (UpdateManager.hasUpdate) {
-                    if (confirm(`发现新版本 v${UpdateManager.remoteVersion}，准备执行系统更新并强制刷新网页(F5)，是否继续？`)) {
-                        $span.text('更新中...');
-                        await UpdateManager.updateAndReload();
-                    } else {
-                        $manualBtn.prop('disabled', false);
-                        refreshUpdateUI();
-                    }
+                    $span.text('更新中...');
+                    await UpdateManager.updateAndReload();
                 } else {
                     toastr.success('已是最新版本');
                     $manualBtn.prop('disabled', false);

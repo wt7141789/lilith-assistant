@@ -104,14 +104,32 @@ export const UpdateManager = {
                 await window.executeSlashCommands('/extension update lilith-assistant');
                 
                 if (typeof toastr !== 'undefined') {
-                    toastr.info('更新指令已发出，3秒后自动刷新网页以加载新版本...', '莉莉丝助手');
+                    toastr.info('正在拉取云端代码，完成后将自动刷新加载新版本...', '莉莉丝助手', { timeOut: 0, extendedTimeOut: 0 });
                 }
                 
-                // Wait for the server-side git pull/update to complete
-                setTimeout(() => {
-                    // Not just refreshing the UI, but a full browser page reload
-                    window.location.href = window.location.href; 
-                }, 3000);
+                // 轮询检测本地版本号是否已更新
+                let attempts = 0;
+                const maxAttempts = 30; // 30次尝试，每秒一次
+                const modulePath = import.meta.url;
+                const manifestPath = new URL('../manifest.json', modulePath).href;
+
+                const checkInterval = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const response = await fetch(manifestPath + '?t=' + Date.now());
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.version === this.remoteVersion || attempts >= maxAttempts) {
+                                clearInterval(checkInterval);
+                                console.log(`[Lilith] Update confirmed (v${data.version}). Reloading...`);
+                                // 额外等待 1 秒确保磁盘写入彻底完成
+                                setTimeout(() => window.location.reload(), 1000);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[Lilith] Polling update check failed:', e);
+                    }
+                }, 1000);
             } else {
                 // Fallback for unexpected environments
                 window.location.reload();
@@ -142,10 +160,8 @@ export const UpdateManager = {
                     // Add click handler for auto-refresh update
                     $badge.on('click', async (e) => {
                         e.stopPropagation(); // Prevents folding the drawer
-                        if (confirm('莉莉丝助手发现新版本，是否立即执行更新？\n(更新完成后会自动刷新网页)')) {
-                            $badge.text('更新中...').css('background', '#555');
-                            await UpdateManager.updateAndReload();
-                        }
+                        $badge.text('更新中...').css('background', '#555');
+                        await UpdateManager.updateAndReload();
                     });
 
                     // Hover effect
