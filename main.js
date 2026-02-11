@@ -5,12 +5,13 @@ import { UIManager } from './modules/ui_manager.js';
 import { assistantManager } from './modules/assistant_manager.js';
 import { EventManager } from './modules/events.js';
 import { AudioSys } from './modules/audio.js';
+import { UpdateManager } from './modules/update_manager.js';
 
 /**
  * Main entrance for the Lilith Assistant Extension.
  */
 async function boot() {
-    console.log('[Lilith] Booting v2.0 (Modularized)...');
+    console.log('[Lilith] Booting v2.5 (Modularized)...');
     
     // 0. Initial Data Migration (Legacy to ExtensionSettings)
     migrateData();
@@ -43,6 +44,9 @@ async function boot() {
     // 6. Start Background Processes
     assistantManager.bindActivityListeners(window);
     assistantManager.startHeartbeat(window);
+
+    // 7. Check for updates
+    UpdateManager.checkUpdate();
     
     console.log('[Lilith] Extension system is ready.');
 }
