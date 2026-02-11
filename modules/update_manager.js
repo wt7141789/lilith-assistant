@@ -8,6 +8,10 @@ export const UpdateManager = {
     localVersion: "2.5.0",
     // Remote manifest URL
     remoteUrl: "https://raw.githubusercontent.com/wt7141789/lilith-assistant/main/manifest.json",
+    
+    // State
+    hasUpdate: false,
+    remoteVersion: null,
 
     /**
      * Check for updates on startup
@@ -20,12 +24,14 @@ export const UpdateManager = {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
             const remoteManifest = await response.json();
-            const remoteVersion = remoteManifest.version;
+            this.remoteVersion = remoteManifest.version;
 
-            if (this.isNewer(remoteVersion, this.localVersion)) {
-                console.log(`[Lilith] Update found! Remote: ${remoteVersion}, Local: ${this.localVersion}`);
+            if (this.isNewer(this.remoteVersion, this.localVersion)) {
+                this.hasUpdate = true;
+                console.log(`[Lilith] Update found! Remote: ${this.remoteVersion}, Local: ${this.localVersion}`);
                 this.showUpdateBadge();
             } else {
+                this.hasUpdate = false;
                 console.log('[Lilith] Up to date.');
             }
         } catch (e) {

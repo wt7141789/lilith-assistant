@@ -3,6 +3,7 @@ import { containerId, avatarId, panelId, bubbleId, PERSONA_DB, AvatarPacks, exte
 import { userState, saveState, saveChat, panelChatHistory, updateFavor, updateSanity, getExtensionSettings, saveExtensionSettings, switchPersonaState } from './storage.js';
 import { AudioSys } from './audio.js';
 import { createSmartRegExp, extractContent } from './utils.js';
+import { UpdateManager } from './update_manager.js';
 
 export const UIManager = {
     assistant: null, // To be set in index.js to avoid circular dependency
@@ -1171,6 +1172,54 @@ export const UIManager = {
             $mode.val(userState.commentMode || 'random');
             $hideAvatar.prop('checked', userState.hideAvatar);
             $avatarSize.val(userState.avatarSize || 150);
+
+            // [新增] 更新检测逻辑
+            const $verInfo = $('#lilith-version-info');
+            const $checkBtn = $('#lilith-check-update-btn');
+            const $manualBtn = $('#lilith-manual-update-btn');
+
+            $verInfo.text(`当前版本: v${UpdateManager.localVersion}`);
+
+            const refreshUpdateUI = () => {
+                if (UpdateManager.hasUpdate) {
+                    $manualBtn.show().text(`检测到 v${UpdateManager.remoteVersion}，点击升级`);
+                    $checkBtn.hide();
+                } else {
+                    $manualBtn.hide();
+                    $checkBtn.show().text('检查更新');
+                }
+            };
+
+            // 初始刷新
+            refreshUpdateUI();
+
+            $checkBtn.on('click', async () => {
+                $checkBtn.text('检查中...').prop('disabled', true);
+                await UpdateManager.checkUpdate();
+                $checkBtn.prop('disabled', false);
+                refreshUpdateUI();
+                if (!UpdateManager.hasUpdate) {
+                    toastr.success('莉莉丝助手已是最新版本');
+                }
+            });
+
+            $manualBtn.on('click', async () => {
+                if (confirm(`准备升级到 v${UpdateManager.remoteVersion}，系统将自动执行更新指令并刷新页面，是否继续？`)) {
+                    $manualBtn.text('正在拉取代码...').prop('disabled', true);
+                    try {
+                        if (typeof window.executeSlashCommands === 'function') {
+                            await window.executeSlashCommands('/extension update lilith-assistant');
+                            toastr.info('更新指令已发出，正在重启环境...');
+                            setTimeout(() => window.location.reload(), 2000);
+                        } else {
+                            window.location.reload();
+                        }
+                    } catch (err) {
+                        console.error('[Lilith] Update failed:', err);
+                        window.location.reload();
+                    }
+                }
+            });
 
             // [新增] 正则方案联动绑定
             const $regexSelect = $('#lilith-regex-preset-select');
