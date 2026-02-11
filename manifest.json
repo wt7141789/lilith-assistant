@@ -6,5 +6,6 @@
     "author": "User",
     "version": "2.5.0",
     "description": "人格化的莉莉丝助手 [v2.5.0 正式版]，具备好感度系统、抽卡、记忆压缩及模块化架构。",
+    "auto_update": true,
     "homePage": ""
 }

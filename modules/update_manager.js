@@ -64,7 +64,36 @@ export const UpdateManager = {
             if ($header.length) {
                 // Avoid duplicate badges
                 if (!$header.find('.lilith-update-badge').length) {
-                    $header.append(' <span class="lilith-update-badge" style="background:#ff0055; color:#fff; font-size:10px; padding:1px 4px; border-radius:3px; margin-left:5px; vertical-align: middle; box-shadow: 0 0 5px #ff0055;">New!</span>');
+                    const $badge = jQuery('<span class="lilith-update-badge" style="background:#ff0055; color:#fff; font-size:10px; padding:2px 6px; border-radius:3px; margin-left:5px; vertical-align: middle; box-shadow: 0 0 5px #ff0055; cursor:pointer; font-weight:bold; transition: transform 0.2s;" title="点击更新并自动刷新">New!</span>');
+                    
+                    // Add click handler for auto-refresh update
+                    $badge.on('click', async (e) => {
+                        e.stopPropagation(); // Prevents folding the drawer
+                        if (confirm('检测到莉莉丝助手有新版本，是否尝试更新并自动刷新网页？')) {
+                            $badge.text('更新中...').css('background', '#555');
+                            
+                            try {
+                                // Attempt to trigger ST update command if available
+                                if (typeof window.executeSlashCommands === 'function') {
+                                    await window.executeSlashCommands('/extension update lilith-assistant');
+                                    console.log('[Lilith] Update command sent. Waiting for 2s before reload...');
+                                    setTimeout(() => window.location.reload(), 2000);
+                                } else {
+                                    // Fallback: Just reload if command system is not reachable
+                                    window.location.reload();
+                                }
+                            } catch (err) {
+                                console.error('[Lilith] Update failed:', err);
+                                window.location.reload(); // Still reload as a fallback
+                            }
+                        }
+                    });
+
+                    // Hover effect
+                    $badge.on('mouseenter', () => $badge.css('transform', 'scale(1.1)'));
+                    $badge.on('mouseleave', () => $badge.css('transform', 'scale(1.0)'));
+                    
+                    $header.append($badge);
                 }
                 clearInterval(poll);
             }
