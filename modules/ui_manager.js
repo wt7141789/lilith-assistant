@@ -484,17 +484,22 @@ export const UIManager = {
     updatePos() {
         const wrapper = document.getElementById(containerId);
         const panel = document.getElementById(panelId);
-        if (!wrapper || !panel) return;
+        const avatar = document.getElementById(avatarId);
+        if (!wrapper || !panel || !avatar) return;
 
-        const rect = wrapper.getBoundingClientRect();
+        // 使用头像的中心点作为判定方位的基础，更加稳定
+        const rect = avatar.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
         
-        // 1:1 复刻原脚本逻辑：中心点位置决定面板方位
-        // 如果在左半屏幕，面板类名设为 pos-right (向右开口)
-        panel.className = (rect.left + rect.width / 2) < window.innerWidth / 2 ? 'pos-right' : 'pos-left';
+        // 判定横向方位 (左/右)
+        panel.className = centerX < window.innerWidth / 2 ? 'pos-right' : 'pos-left';
         
-        // 如果在屏幕下半部，添加 pos-top-align (向上开口)
-        if ((rect.top + rect.height / 2) > window.innerHeight * 0.6) {
+        // 判定纵向方位 (上/下)
+        if (centerY > window.innerHeight * 0.5) {
             panel.classList.add('pos-top-align');
+        } else {
+            panel.classList.remove('pos-top-align');
         }
     },
 

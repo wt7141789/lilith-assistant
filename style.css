@@ -172,7 +172,7 @@ div.lilith-chat-ui:hover {
 /* 悬浮助手样式更新 */
 #lilith-wrapper-cn { 
     position: fixed; z-index: 99999; display: flex; flex-direction: column; align-items: center; 
-    min-width: 280px; font-family: var(--l-font); letter-spacing: 0.5px; pointer-events: none; 
+    min-width: 90px; font-family: var(--l-font); letter-spacing: 0.5px; pointer-events: none; 
 }
 
 #lilith-avatar-cn { 
@@ -181,7 +181,7 @@ div.lilith-chat-ui:hover {
     border-radius: 50%; 
     border: 2px solid var(--l-main); 
     box-shadow: 0 0 15px var(--l-main), inset 0 0 10px rgba(0,0,0,0.5); 
-    cursor: move; margin-bottom: -45px; transition: 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
+    cursor: move; transition: 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
     pointer-events: auto;
     touch-action: none;
     animation: pulse-glow 5s infinite ease-in-out;
@@ -280,7 +280,9 @@ div.lilith-chat-ui:hover {
 }
 
 #lilith-panel-cn { 
-    position: relative;
+    position: absolute;
+    top: 45px;
+    left: 0;
     z-index: 5;
     width: 100%; 
     height: 520px; /* 由 JS 动态控制，这里作为兜底 */
@@ -291,13 +293,13 @@ div.lilith-chat-ui:hover {
     display: flex; flex-direction: column; 
     color: #fff; 
     box-shadow: 0 10px 50px rgba(0,0,0,0.8); 
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.19, 1, 0.22, 1);
     clip-path: polygon(0 0, 100% 0, 100% 98%, 95% 100%, 5% 100%, 0 98%);
     padding-top: 50px;
     pointer-events: auto;
     /* 初始状态用于动画 */
     opacity: 0;
-    transform: translateY(20px) scale(0.9);
+    transform: translateY(-10px) scale(0.9);
     pointer-events: none;
     visibility: hidden;
 }
@@ -333,20 +335,18 @@ div.lilith-chat-ui:hover {
     visibility: visible;
 }
 
-/* 翻转逻辑：面板类名包含 pos-top-align 时，反转 flex 方向 */
-#lilith-wrapper-cn:has(.pos-top-align) { flex-direction: column-reverse; }
-
-#lilith-wrapper-cn:has(.pos-top-align) #lilith-avatar-cn { 
-    margin-bottom: 0; 
-    margin-top: -45px; 
-}
+/* 翻转逻辑：面板类名包含 pos-top-align 时，反转位置 */
+/* 移除 #lilith-wrapper-cn:has(.pos-top-align) { flex-direction: column-reverse; } 因为现在用 absolute 定位 */
 
 #lilith-wrapper-cn:has(.pos-top-align) #lilith-panel-cn {
+    top: auto;
+    bottom: 45px;
     border-top: 1px solid #444;
     border-bottom: 2px solid var(--l-main);
     clip-path: polygon(0 2%, 5% 0, 95% 0, 100% 2%, 100% 100%, 0 100%);
     padding-top: 0;
     padding-bottom: 50px;
+    transform: translateY(10px) scale(0.9);
 }
 
 #lilith-wrapper-cn:has(.pos-top-align) #lilith-panel-cn.active {
