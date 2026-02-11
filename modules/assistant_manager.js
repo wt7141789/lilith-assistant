@@ -96,11 +96,23 @@ export const assistantManager = {
                 // 参考“母上选项”逻辑，使用 /send 指令直接发送，更加稳定
                 // 使用 | /trigger 确保在发送后立即触发 AI 生成
                 const command = `/send ${text} | /trigger`;
-                context.executeSlashCommand(command);
+                if (typeof context.executeSlashCommands === 'function') {
+                    context.executeSlashCommands(command);
+                } else if (typeof context.executeSlashCommand === 'function') {
+                    context.executeSlashCommand(command);
+                } else {
+                    throw new Error('No slash command execution method found');
+                }
             } else {
                 // 仅输入模式：使用 /setinput
                 const command = `/setinput ${text}`;
-                context.executeSlashCommand(command);
+                if (typeof context.executeSlashCommands === 'function') {
+                    context.executeSlashCommands(command);
+                } else if (typeof context.executeSlashCommand === 'function') {
+                    context.executeSlashCommand(command);
+                } else {
+                    throw new Error('No slash command execution method found');
+                }
             }
         } catch (e) {
             console.warn('[Lilith] SillyTavern API execution failed, falling back to DOM manipulation.', e);

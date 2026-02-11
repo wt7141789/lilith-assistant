@@ -4,8 +4,8 @@
     "js": "index.js",
     "css": "style.css",
     "author": "User",
-    "version": "2.5.7",
-    "description": "人格化的莉莉丝助手 [v2.5.7]，具备好感度系统、抽卡、记忆压缩、基于指令系统的自动发送及模块化架构。",
+    "version": "2.5.8",
+    "description": "人格化的莉莉丝助手 [v2.5.8]，具备好感度系统、抽卡、记忆压缩、基于指令系统的自动发送及模块化架构。",
     "auto_update": true,
     "homePage": ""
 }
