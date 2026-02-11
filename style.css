@@ -204,6 +204,19 @@ div.lilith-chat-ui:hover {
     overflow: visible; 
 }
 
+/* 增加透明桥接层，防止鼠标在头像和面板间跨越时的死区闪烁 */
+#lilith-avatar-cn::after {
+    content: "";
+    position: absolute;
+    top: -10px;
+    bottom: calc(-1 * var(--l-panel-offset) - 10px);
+    left: -10px;
+    right: -10px;
+    background: transparent;
+    pointer-events: auto;
+    z-index: -1;
+}
+
 @media screen and (max-width: 600px) {
     #lilith-avatar-cn {
         /* 变量已经处理了宽高 */
@@ -270,7 +283,7 @@ div.lilith-chat-ui:hover {
     transform: scale(1.05) rotate(2deg); 
     box-shadow: 0 0 50px var(--l-main);
     filter: brightness(1.2);
-    z-index: 11;
+    z-index: 60;
 }
 
 @keyframes pulse-glow { 

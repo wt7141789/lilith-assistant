@@ -548,13 +548,27 @@ export const UIManager = {
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
         
-        // 判定横向方位 (左/右)
-        panel.className = centerX < window.innerWidth / 2 ? 'pos-right' : 'pos-left';
+        // 判定横向方位 (左/右) - 增加 40px 的缓冲区防止在中心线来回跳变
+        const thresholdX = window.innerWidth / 2;
+        const marginX = 40;
+        const currentPos = panel.classList.contains('pos-left') ? 'left' : 'right';
+
+        if (centerX < thresholdX - marginX) {
+            panel.classList.remove('pos-left');
+            panel.classList.add('pos-right');
+        } else if (centerX > thresholdX + marginX) {
+            panel.classList.remove('pos-right');
+            panel.classList.add('pos-left');
+        }
         
-        // 判定纵向方位 (上/下)
-        if (centerY > window.innerHeight * 0.5) {
+        // 判定纵向方位 (上/下) - 增加 40px 缓冲区
+        const thresholdY = window.innerHeight * 0.5;
+        const marginY = 40;
+        const isCurrentlyTop = panel.classList.contains('pos-top-align');
+        
+        if (centerY > thresholdY + marginY) {
             panel.classList.add('pos-top-align');
-        } else {
+        } else if (centerY < thresholdY - marginY) {
             panel.classList.remove('pos-top-align');
         }
     },
