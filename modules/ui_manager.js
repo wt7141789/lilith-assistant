@@ -1146,6 +1146,17 @@ export const UIManager = {
         setTimeout(() => { if (b.parentNode) b.remove(); }, duration);
     },
 
+    showStatusChange(msg, color = "#ff0055") {
+        const avatar = document.getElementById(avatarId);
+        if (!avatar) return;
+        const toast = document.createElement('div');
+        toast.className = 'status-toast';
+        toast.style.color = color;
+        toast.textContent = msg;
+        avatar.appendChild(toast);
+        setTimeout(() => toast.remove(), 1500);
+    },
+
     togglePanel() {
         const p = document.getElementById(panelId);
         if (!p) return;
@@ -1231,12 +1242,12 @@ export const UIManager = {
             if (sMatch) {
                 const val = parseInt(sMatch[1]);
                 updateSanity(val);
-                if (save && val !== 0) this.showBubble(`理智 ${val > 0 ? '+' : ''}${val}`, "#00e5ff");
+                if (save && val !== 0) this.showStatusChange(`理智 ${val > 0 ? '+' : ''}${val}`, "#00e5ff");
             }
             if (fMatch) {
                 const val = parseInt(fMatch[1]);
                 updateFavor(val);
-                if (save && val !== 0) this.showBubble(`好感 ${val > 0 ? '+' : ''}${val}`, "#ff0055");
+                if (save && val !== 0) this.showStatusChange(`好感 ${val > 0 ? '+' : ''}${val}`, "#ff0055");
             }
             // 清理数值标签用于显示和解析
             displayTagName = text.replace(/\[[SF]:[+\-]?\d+\]/gi, '').trim();

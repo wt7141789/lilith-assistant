@@ -204,6 +204,33 @@ div.lilith-chat-ui:hover {
     }
 }
 
+/* 气泡 - 增加特殊事件类样式 */
+.special-event {
+    background: rgba(189, 0, 255, 0.1) !important;
+    border-color: #bd00ff !important;
+    font-weight: bold;
+}
+
+/* 浮动数值通知 */
+.status-toast {
+    position: absolute;
+    top: -20px;
+    z-index: 100;
+    font-weight: bold;
+    font-size: 16px;
+    text-shadow: 0 0 5px rgba(0,0,0,0.8), 0 0 10px currentColor;
+    pointer-events: none;
+    animation: status-float 1.5s ease-out forwards;
+    white-space: nowrap;
+}
+
+@keyframes status-float {
+    0% { transform: translateY(0); opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { transform: translateY(-40px); opacity: 0; }
+}
+
 #lilith-wrapper-cn { 
     position: fixed; z-index: 99999; display: flex; flex-direction: column; align-items: center; 
     min-width: 90px; max-width: 95vw; font-family: var(--l-font); letter-spacing: 0.5px; pointer-events: none; 

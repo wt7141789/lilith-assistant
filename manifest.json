@@ -4,8 +4,8 @@
     "js": "index.js",
     "css": "style.css",
     "author": "User",
-    "version": "3.0.2",
-    "description": "人格化的莉莉丝助手 [v3.0.2]，具备好感度系统、抽卡、记忆压缩、AI 动态内容生成、针对慢速服务器优化的智能更新流。",
+    "version": "3.0.3",
+    "description": "人格化的莉莉丝助手 [v3.0.3]，具备好感度系统、AI 动态内容生成、非侵入式悬浮数值通知。",
     "auto_update": true,
     "homePage": ""
 }

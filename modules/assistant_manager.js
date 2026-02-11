@@ -963,11 +963,11 @@ ${chatLog}
                         // 数值变动并同步更新 UI
                         if (e.favor) {
                             const val = updateFavor(e.favor, () => UIManager.updateUI());
-                            setTimeout(() => UIManager.showBubble(`好感 ${val > 0 ? '+' : ''}${val}`, "#ff0055"), 1200);
+                            setTimeout(() => UIManager.showStatusChange(`好感 ${val > 0 ? '+' : ''}${val}`, "#ff0055"), 1200);
                         }
                         if (e.sanity) {
                             const val = updateSanity(e.sanity, () => UIManager.updateUI());
-                            setTimeout(() => UIManager.showBubble(`理智 ${val > 0 ? '+' : ''}${val}`, "#00e5ff"), 2000);
+                            setTimeout(() => UIManager.showStatusChange(`理智 ${val > 0 ? '+' : ''}${val}`, "#00e5ff"), 2000);
                         }
                     }
                 }
@@ -988,7 +988,7 @@ ${chatLog}
                         const lastMsg = chat[chat.length - 1];
                         if (lastMsg && lastMsg.is_user && answers.some(a => lastMsg.mes.includes(a))) {
                             AudioSys.speak("哼，算你过关。");
-                            UIManager.showBubble(`奖励 ${reward} FP`, "#0f0");
+                            UIManager.showStatusChange(`奖励 ${reward} FP`, "#0f0");
                             updateFavor(2);
                             userState.fatePoints += reward;
                             saveState();
@@ -1012,7 +1012,7 @@ ${chatLog}
                     saveState();
                     const fpEl = document.getElementById('gacha-fp-val');
                     if (fpEl) fpEl.textContent = userState.fatePoints;
-                    UIManager.showBubble(`地上捡到了 ${amt} FP，运气不错嘛。`, "#ffd700");
+                    UIManager.showStatusChange(`+ ${amt} FP`, "#ffd700");
                     AudioSys.speak("地上捡到了钱？分我一半。");
                 }
             },
@@ -1171,7 +1171,7 @@ ${chatLog}
                     AudioSys.speak(randomMsg);
                     if (Math.random() > 0.5) { 
                         updateFavor(-1); 
-                        UIManager.showBubble("好感度 -1 (你真冷淡)", "#f00"); 
+                        UIManager.showStatusChange("好感度 -1 (你真冷淡)", "#f00"); 
                     }
                 }
             } catch (e) { console.error("Heartbeat Error:", e); }
