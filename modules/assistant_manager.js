@@ -1130,7 +1130,7 @@ ${chatLog}
                 // --- 动态内容维护 ---
                 if (userState.dynamicContentEnabled && !this.isGenerating) {
                     const now = Date.now();
-                    const intervalMin = Number(userState.dynamicContentInterval) || 240;
+                    const intervalMin = Number(userState.dynamicContentInterval) || 20;
                     const last = Number(userState.dynamicContent?.lastGenerated) || 0;
                     const intervalMs = intervalMin * 60000;
                     

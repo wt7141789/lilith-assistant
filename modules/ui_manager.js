@@ -252,7 +252,7 @@ export const UIManager = {
                             <span style="font-size:12px; color:#ccc;">启用 AI 动态更新</span>
                         </div>
                         <div style="font-size:10px; color:#888; margin-top:5px;">生成间隔 (分钟):</div>
-                        <input type="number" id="cfg-dyn-interval" class="lilith-input" min="1" max="4320" step="1" value="${userState.dynamicContentInterval || 240}" style="width: 100%; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; padding: 4px; font-size: 12px;">
+                        <input type="number" id="cfg-dyn-interval" class="lilith-input" min="1" max="4320" step="1" value="${userState.dynamicContentInterval || 20}" style="width: 100%; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; padding: 4px; font-size: 12px;">
                         
                         <div style="font-size:10px; color:#888; margin-top:5px;">每次生成数:</div>
                         <input type="number" id="cfg-dyn-count" class="lilith-input" min="1" max="20" step="1" value="${userState.dynamicContentCount || 6}" style="width: 100%; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; padding: 4px; font-size: 12px;">
