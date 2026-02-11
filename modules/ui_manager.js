@@ -179,7 +179,9 @@ export const UIManager = {
                         <span style="font-size:10px; color:var(--l-cyan);">*每20条对话自动总结归档，旧对话将被压缩。*</span>
                     </div>
                     <div id="memory-container" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
-                    <button id="btn-force-memory" class="tool-btn" style="width:100%; margin-top:10px; border-color:#bd00ff;">⚡ 强制现在总结记忆</button>
+                    <div class="lilith-chat-footer" style="padding: 10px 0 0 0; margin-top: auto;">
+                        <button id="btn-force-memory" class="tool-btn" style="width:100%; border-color:#bd00ff; height: 36px; font-weight: bold;">⚡ 强制现在总结记忆</button>
+                    </div>
                 </div>
                 <div id="page-gacha" class="lilith-page">
                     <div class="gacha-header">
