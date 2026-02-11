@@ -1177,13 +1177,24 @@ export const UIManager = {
             const $verInfo = $('#lilith-version-info');
             const $manualBtn = $('#lilith-manual-update-btn');
 
-            $verInfo.text(`当前版本: v${UpdateManager.localVersion}`);
+            $verInfo.text(`${UpdateManager.localVersion}`);
 
             const refreshUpdateUI = () => {
+                const $btnText = $manualBtn.find('span');
                 if (UpdateManager.hasUpdate) {
-                    $manualBtn.text(`发现新版本 v${UpdateManager.remoteVersion}，点击更新`).css('background', '#ff0055');
+                    $btnText.text(`发现新版 v${UpdateManager.remoteVersion}`);
+                    $manualBtn.css({
+                        'background': 'var(--l-main, #ff0055)',
+                        'color': '#fff',
+                        'border': '1px solid #ff0055'
+                    });
                 } else {
-                    $manualBtn.text('更新插件').css('background', '');
+                    $btnText.text('更新插件');
+                    $manualBtn.css({
+                        'background': '',
+                        'color': '',
+                        'border': ''
+                    });
                 }
             };
 
@@ -1191,12 +1202,20 @@ export const UIManager = {
             refreshUpdateUI();
 
             $manualBtn.on('click', async () => {
-                $manualBtn.text('同步中...').prop('disabled', true);
+                const $span = $manualBtn.find('span');
+                const $icon = $manualBtn.find('i');
+                
+                $span.text('同步中...');
+                $icon.addClass('fa-spin');
+                $manualBtn.prop('disabled', true);
+                
                 await UpdateManager.checkUpdate();
+                
+                $icon.removeClass('fa-spin');
                 
                 if (UpdateManager.hasUpdate) {
                     if (confirm(`发现新版本 v${UpdateManager.remoteVersion}，准备执行系统更新并强制刷新网页(F5)，是否继续？`)) {
-                        $manualBtn.text('正在更新...');
+                        $span.text('更新中...');
                         await UpdateManager.updateAndReload();
                     } else {
                         $manualBtn.prop('disabled', false);
