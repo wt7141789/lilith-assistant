@@ -190,7 +190,7 @@ div.lilith-chat-ui:hover {
 }
 
 #lilith-avatar-cn { 
-    order: -1; position: relative; z-index: 20; 
+    order: -1; position: relative; z-index: 10; 
     width: var(--l-avatar-size); height: var(--l-avatar-size); 
     background-size: cover; background-position: center;
     border-radius: 50%; 
@@ -267,9 +267,10 @@ div.lilith-chat-ui:hover {
 }
 
 #lilith-avatar-cn:hover { 
-    transform: scale(1.1) rotate(2deg); 
+    transform: scale(1.05) rotate(2deg); 
     box-shadow: 0 0 50px var(--l-main);
     filter: brightness(1.2);
+    z-index: 11;
 }
 
 @keyframes pulse-glow { 
@@ -289,7 +290,7 @@ div.lilith-chat-ui:hover {
     color: #fff; padding: 10px; font-size: 13px; 
     box-shadow: 0 5px 15px rgba(0,0,0,0.5);
     backdrop-filter: blur(5px);
-    z-index: 30;
+    z-index: 100;
     cursor: pointer;
     pointer-events: auto;
     /* 极致包裹修复 */
@@ -312,7 +313,7 @@ div.lilith-chat-ui:hover {
     position: absolute;
     top: var(--l-panel-offset);
     left: 0;
-    z-index: 5;
+    z-index: 30;
     width: 100%; 
     height: 520px; /* 由 JS 动态控制，这里作为兜底 */
     max-height: var(--l-panel-max-height); 
