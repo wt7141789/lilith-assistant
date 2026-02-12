@@ -1,10 +1,10 @@
 // modules/audio.js
-import { getExtensionSettings, saveExtensionSettings, userState } from './storage.js';
+import { userState, saveState } from './storage.js';
 import { PERSONA_DB } from './config.js';
 
 export const AudioSys = {
-    get muted() { return getExtensionSettings().muted === true; },
-    set muted(val) { getExtensionSettings().muted = val; saveExtensionSettings(); },
+    get muted() { return userState.muted === true; },
+    set muted(val) { userState.muted = val; saveState(); },
     toggleMute() {
         this.muted = !this.muted;
         window.speechSynthesis.cancel();
@@ -26,6 +26,9 @@ export const AudioSys = {
     
     speak(text) {
         if (this.muted || !text) return;
+        // [锁定策略] 核心锁定时静默
+        if (window.UIManager && window.UIManager.isLocked) return;
+
         const cleanText = text.replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').replace(/[*#`~]/g, '').trim();
         if (!cleanText) return;
 

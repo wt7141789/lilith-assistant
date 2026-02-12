@@ -11,8 +11,11 @@ import { UpdateManager } from './modules/update_manager.js';
  * Main entrance for the Lilith Assistant Extension.
  */
 async function boot() {
-    console.log('[Lilith] Booting v3.0.0 (Modularized)...');
+    console.log('[Lilith] Booting v3.0.5 (Modularized)...');
     
+    // 0. Expose UIManager to window for global access (e.g., from InnerWorldManager)
+    window.UIManager = UIManager;
+
     // 1. Validate and finalize state
     validateState();
 
@@ -23,6 +26,7 @@ async function boot() {
 
     // 3. Initialize UI Structure (Floating Panel & Avatar)
     UIManager.initStruct();
+    UIManager.initAutoLock(window); // 启动自动锁定监测
     
     // 3.5. Initialize Settings UI in the ST Extensions sidebar
     await UpdateManager.init();

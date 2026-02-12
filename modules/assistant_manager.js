@@ -5,6 +5,7 @@ import { AudioSys } from './audio.js';
 import { getDynamicPersona } from './persona.js';
 import { getPageContext, createSmartRegExp, extractContent } from './utils.js';
 import { UIManager } from './ui_manager.js';
+import { InnerWorldManager } from './inner_world_manager.js';
 
 export const assistantManager = {
     config: {
@@ -368,20 +369,39 @@ export const assistantManager = {
         try {
             const { isChat = false, mode = "normal", systemPrompt = null } = options; 
             const isInternal = mode === 'memory_internal';
+
             const { apiType, apiKey, baseUrl, model } = this.config; 
             if (!apiKey) return null;
             
             let url = baseUrl.replace(/\/$/, ''); 
-            let finalSystemPrompt = systemPrompt || getDynamicPersona();
+            
+            // [PRIORITY RULE]: Always enforce the core persona prompt as the foundation
+            const basePersona = PERSONA_DB[userState.activePersona || 'toxic'].prompt;
+            let finalSystemPrompt = "";
+
+            if (systemPrompt) {
+                // If a specific task prompt is provided (e.g. from Tool execution), 
+                // wrap it with the core persona rules to ensure character consistency.
+                finalSystemPrompt = `[HIGHEST PRIORITY: CORE CHARACTER RULES]\n${basePersona}\n\n[CURRENT TASK INSTRUCTIONS]\n${systemPrompt}\n\n[STRICT CONSTRAINT: You MUST maintain the persona above while completing the task.]`;
+            } else {
+                // Default conversation mode
+                finalSystemPrompt = getDynamicPersona();
+            }
             
             const memoryBlock = userState.memoryArchive.length > 0 ? `\n[Long-term Memory / Previous Context]:\n${userState.memoryArchive.join('\n')}\n` : "";
+            const isInjectingWorld = userState.injectDashboard !== false;
+            const coreDataBlock = isInjectingWorld ? InnerWorldManager.getSummaryContext() : "";
             
             if (!isInternal) { 
                 if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]"; 
                 else if (isChat) { 
                     finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; 
                     finalSystemPrompt += memoryBlock; 
-                } else finalSystemPrompt += `\n${JAILBREAK}`; 
+                    if (isInjectingWorld) finalSystemPrompt += coreDataBlock;
+                } else {
+                    finalSystemPrompt += `\n${JAILBREAK}`; 
+                    if (isInjectingWorld) finalSystemPrompt += coreDataBlock;
+                }
             }
             
             let msgs = isChat && !isInternal ? [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }] : [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
@@ -486,12 +506,15 @@ export const assistantManager = {
         const bubble = document.getElementById('lilith-bubble-cn');
         if (bubble) bubble.textContent = randomThinking;
 
-        const chatLog = getPageContext(5, userState).map(m => `${m.name}: ${m.message}`).join('\n');
+        const isInjecting = userState.injectSTContext !== false;
+        const chatLog = isInjecting ? getPageContext(5, userState).map(m => `${m.name}: ${m.message}`).join('\n') : "(Context injection disabled by user)";
         const persona = PERSONA_DB[userState.activePersona] || PERSONA_DB['toxic'];
         
         const systemPrompt = `[System Task: Chat Interjection]
-You are ${persona.name}. You are observing the user's conversation with another character.
+You are ${persona.name}. ${isInjecting ? "You are observing the user's conversation with another character." : "You are currently interacting based on your standalone persona."}
 The user just received a reply. Your job is to interject with a short, sharp, and very ${userState.activePersona} comment.
+
+${isInjecting ? "" : "Note: ST Chat History is hidden. Focus purely on the target message provided."}
 
 [PLACEMENT LOGIC]
 Instead of just appending to the end, you should find a contextually relevant position within the message to inject your comment.
@@ -623,8 +646,9 @@ ${chatLog}
         if (!toolOutput) return;
         toolOutput.innerHTML = `<div class="scan-line-s"></div><div style="color:var(--l-cyan);">⚡ 正在运行肮脏的协议 [${name}]...</div>`;
 
-        const contextMsg = getPageContext(name === "废物体检报告" ? 100 : 25, userState);
-        const contextStr = contextMsg.map(m => `[${m.name}]: ${m.message}`).join('\n');
+        const isInjecting = userState.injectSTContext !== false;
+        const contextMsg = isInjecting ? getPageContext(name === "废物体检报告" ? 100 : 25, userState) : [];
+        const contextStr = isInjecting ? contextMsg.map(m => `[${m.name}]: ${m.message}`).join('\n') : "(ST Context injection disabled by user)";
         const safeContext = `[TARGET DATA START]\n${contextStr}\n[TARGET DATA END]`;
 
         let specificPrompt = "";
@@ -766,6 +790,7 @@ ${chatLog}
     },
 
     async generateDynamicContent(parentWin) {
+        if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止AI逻辑
         console.log('[Lilith] Generating dynamic content...');
         // 关键修复：确保每次生成都从 userState 中获取最新的好感、理智和条目数
         const f = Number(userState.favorability) || 20;
@@ -802,10 +827,17 @@ normal, angry, speechless, mockery, horny, happy, disgust, love
 - Language: Chinese.
 - JSON MUST BE VALID.`;
 
-        const chatLog = getPageContext(15, userState).map(m => `[${m.name}]: ${m.message}`).join('\n');
+        const isInjecting = userState.injectSTContext !== false;
+        const isInjectingWorld = userState.injectDashboard !== false;
+        const chatLog = isInjecting ? getPageContext(15, userState).map(m => `[${m.name}]: ${m.message}`).join('\n') : "(Context injection disabled by user)";
+        const coreSummary = isInjectingWorld ? InnerWorldManager.getSummaryContext() : "";
+        
         const userPrompt = `[CURRENT STATUS]
 Favorability: ${f}
 Sanity: ${s}
+
+[INNER WORLD DATA]
+${coreSummary || "(Inner World injection disabled)"}
 
 [RECENT HISTORY]
 ${chatLog}
@@ -979,7 +1011,7 @@ ${chatLog}
                 run: () => {
                     const answers = ['我爱你', '喜欢', 'yes', '爱'];
                     const reward = 50;
-                    const msg = "【突击检查】\n现在立刻马上说你爱我！(3秒内)";
+                    const msg = "【突击检查】\n现在立刻马上说你爱我！(30秒内)";
                     UIManager.showBubble(msg, "#ff0055");
                     AudioSys.speak("喂！突击检查！说你爱我！");
                     
@@ -987,21 +1019,24 @@ ${chatLog}
                         const context = SillyTavern.getContext();
                         const chat = context.chat || [];
                         const lastMsg = chat[chat.length - 1];
-                        if (lastMsg && lastMsg.is_user && answers.some(a => lastMsg.mes.includes(a))) {
-                            AudioSys.speak("哼，算你过关。");
-                            UIManager.showStatusChange(`奖励 ${reward} FP`, "#0f0");
-                            updateFavor(2);
-                            userState.fatePoints += reward;
-                            saveState();
-                            const fpEl = document.getElementById('gacha-fp-val');
-                            if (fpEl) fpEl.textContent = userState.fatePoints;
-                        } else {
-                            AudioSys.speak("啧，看来你并不爱我啊。");
-                            updateFavor(-1);
-                            saveState();
+                        if (lastMsg && lastMsg.is_user) {
+                            const optimizedText = extractContent(lastMsg.mes, userState);
+                            if (answers.some(a => optimizedText.includes(a))) {
+                                AudioSys.speak("哼，算你过关。");
+                                UIManager.showStatusChange(`奖励 ${reward} FP`, "#0f0");
+                                updateFavor(2);
+                                userState.fatePoints += reward;
+                                saveState();
+                                const fpEl = document.getElementById('gacha-fp-val');
+                                if (fpEl) fpEl.textContent = userState.fatePoints;
+                            } else {
+                                AudioSys.speak("啧，看来你并不爱我啊。");
+                                updateFavor(-1);
+                                saveState();
+                            }
                         }
                     };
-                    setTimeout(checkInput, 5000); 
+                    setTimeout(checkInput, 30000); 
                 }
             },
             {
@@ -1031,7 +1066,7 @@ ${chatLog}
             },
             {
                 id: 'ransomware',
-                weight: 2,
+                weight: 5,
                 run: () => {
                     const overlayId = 'lilith-overlay-blocker';
                     if (document.getElementById(overlayId)) return;
@@ -1039,23 +1074,34 @@ ${chatLog}
                     overlay.id = overlayId;
                     overlay.className = 'ransom-overlay';
                     overlay.innerHTML = `
-                        <div class="ransom-box">
-                            <h2 style="color:red; margin:0;">🔒 SYSTEM LOCKED by LILITH</h2>
-                            <p>你的操作权限已被锁定。</p>
-                            <p>想要解锁？支付 <strong>100 FP</strong> 给我买零食。</p>
-                            <div style="margin-top:20px; display:flex; gap:10px;">
-                                <button id="btn-pay-ransom" style="flex:1; background:#0f0; border:none; padding:10px; cursor:pointer; font-weight:bold;">给钱 (100 FP)</button>
-                                <button id="btn-refuse-ransom" style="flex:1; background:#555; border:none; padding:10px; cursor:pointer; color:#ccc;">拒绝 (好感 -5)</button>
+                        <div class="ransom-box" style="text-align:center;">
+                            <h2 style="color:#ff00ea; margin:0; font-size:18px;">🔒 SYSTEM LOCKED</h2>
+                            <p style="font-size:13px; margin:10px 0;">莉莉丝正在入侵您的系统...已锁定操作界面！<br>除非您支付 <strong>100 FP</strong> 作为赎金，或者在下方说出“<strong>莉莉丝我爱你</strong>”，否则无法解锁。</p>
+                            <input type="text" id="ransom-input" placeholder="在这输入解锁暗号..." style="width:100%; border:1px solid #ff00ea; background:#1a1a1a; color:#fff; padding:8px; margin-bottom:15px; border-radius:4px; outline:none;">
+                            <div style="display:flex; gap:10px;">
+                                <button id="btn-pay-ransom" style="flex:1; background:#0f0; border:none; padding:10px; cursor:pointer; font-weight:bold; border-radius:4px;">支付 (100 FP)</button>
+                                <button id="btn-refuse-ransom" style="flex:1; background:#555; border:none; padding:10px; cursor:pointer; color:#ccc; border-radius:4px;">拒绝 (好感 -5)</button>
                             </div>
                         </div>
                     `;
                     document.body.appendChild(overlay);
-                    AudioSys.speak("打劫，交出FP来。", 0.6);
+                    AudioSys.speak("【系统漏洞】莉莉丝正在入侵您的系统...已锁定操作界面！", 0.6);
+
+                    const input = document.getElementById('ransom-input');
+                    input.focus();
+                    input.oninput = () => {
+                        if (input.value.includes("莉莉丝我爱你") || input.value.includes("我爱你")) {
+                            AudioSys.speak("哼，算你识相。下次记得主动点哦~");
+                            updateFavor(2);
+                            saveState();
+                            overlay.remove();
+                        }
+                    };
 
                     document.getElementById('btn-pay-ransom').onclick = () => {
                         if (userState.fatePoints >= 100) {
                             userState.fatePoints -= 100;
-                            updateFavor(2);
+                            updateFavor(1);
                             saveState();
                             const fpEl = document.getElementById('gacha-fp-val');
                             if (fpEl) fpEl.textContent = userState.fatePoints;
@@ -1063,7 +1109,6 @@ ${chatLog}
                             overlay.remove();
                         } else {
                             alert("穷鬼！没钱还想赎身？滚！");
-                            overlay.remove();
                         }
                     };
                     document.getElementById('btn-refuse-ransom').onclick = () => {
@@ -1108,6 +1153,7 @@ ${chatLog}
     startHeartbeat(parentWin) {
         console.log('[Lilith] Heartbeat system started.');
         setInterval(() => {
+            if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止所有循环逻辑
             try {
                 const avatar = document.getElementById(avatarId);
                 if (avatar) {
@@ -1148,25 +1194,46 @@ ${chatLog}
 
                 const glitchLayer = document.getElementById('lilith-glitch-layer');
                 if (glitchLayer) {
+                    const now = Date.now();
+                    const dismissedUntil = window.lilithGlitchDismissedUntil || 0;
                     const s = userState.sanity;
-                    if (s < 30) {
+
+                    if (s < 30 && now > dismissedUntil) {
                         glitchLayer.style.opacity = '1';
+                        glitchLayer.classList.add('glitch-active');
                         if (!glitchLayer.classList.contains('sanity-critical')) {
                             glitchLayer.classList.add('sanity-critical');
                             if (Math.random() < 0.1) AudioSys.speak("坏掉了...要坏掉了...哈啊...");
                         }
-                    } else if (s < 60) {
-                        // 移除全屏粉色闪烁：用户反馈干扰
-                        // if (Math.random() < 0.1) { glitchLayer.style.opacity = '0.3'; glitchLayer.style.background = 'rgba(255,0,0,0.1)'; setTimeout(() => { glitchLayer.style.opacity = '0'; }, 200); }
-                        glitchLayer.style.opacity = '0';
+                    } else if (s < 60 && now > dismissedUntil) {
+                        // 60以下偶尔闪烁一下 (保持原版逻辑)
+                        if (Math.random() < 0.05) {
+                            glitchLayer.style.opacity = '0.3';
+                            glitchLayer.style.background = 'rgba(255,0,0,0.1)';
+                            glitchLayer.classList.add('glitch-active');
+                            setTimeout(() => { 
+                                if (Date.now() > (window.lilithGlitchDismissedUntil || 0)) {
+                                    glitchLayer.style.opacity = '0';
+                                    glitchLayer.classList.remove('glitch-active');
+                                }
+                            }, 300);
+                        }
                         glitchLayer.classList.remove('sanity-critical');
-                    } else { glitchLayer.style.opacity = '0'; glitchLayer.classList.remove('sanity-critical'); }
+                    } else {
+                        if (now > dismissedUntil) {
+                            glitchLayer.style.opacity = '0';
+                            glitchLayer.classList.remove('glitch-active');
+                        }
+                        glitchLayer.classList.remove('sanity-critical');
+                    }
                 }
 
                 const idleTime = Date.now() - this.lastActivityTime;
                 if (idleTime > 180000 && !this.isIdleTriggered) {
                     this.isIdleTriggered = true;
-                    const idleMsgs = ["你是死在电脑前了吗？恶心。", "喂，放置play也要有个限度吧？", "我的身体好热...你居然不理我？渣男。", "再不动一下，我就要去找别的男人了哦？"];
+                    // --- 优化：根据当前人格获取闲聊文本 ---
+                    const personaData = PERSONA_DB[userState.activePersona || 'toxic'];
+                    const idleMsgs = personaData.idleDialogues || ["你是死在电脑前了吗？恶心。", "喂，放置play也要有个限度吧？"];
                     const randomMsg = idleMsgs[Math.floor(Math.random() * idleMsgs.length)];
                     UIManager.showBubble(randomMsg); 
                     AudioSys.speak(randomMsg);
@@ -1214,122 +1281,9 @@ ${chatLog}
                         }
                     };
                 }
-                if(msgBox) msgBox.textContent = "✅ 连接上了";
-            } else { if(msgBox) msgBox.textContent = "⚠️ 啥都没有"; }
-        } catch(e) { console.error(e); if(msgBox) msgBox.textContent = "❌ 烂掉了: " + e.message; }
-    },
-
-    async runTool(parentWin, name) {
-        const toolOutput = document.getElementById('tool-output-area'); 
-        if(!toolOutput) return;
-        toolOutput.innerHTML = `<div class="scan-line-s"></div><div style="color:var(--l-cyan);">⚡ 正在运行肮脏的协议 [${name}]...</div>`;
-        
-        const contextMsg = getPageContext(name === "废物体检报告" ? 100 : 25, userState);
-        const contextStr = contextMsg.map(m => `[${m.name}]: ${m.message}`).join('\n');
-        const safeContext = `[TARGET DATA START]\n${contextStr}\n[TARGET DATA END]`;
-        let specificPrompt = ""; 
-        let isInteractive = false; 
-        let sysPersona = getDynamicPersona();
-
-        if (name === "强制福利事件") {
-            sysPersona = WRITER_PERSONA;
-            specificPrompt = `Generate a single, vivid, erotic event happening to the User right now.\n**Constraint:** Write strictly in **First Person (I/Me)** perspective of the User.\n**Constraint:** Do NOT offer choices. Just describe the lucky lewd scenario.\n**Language:** Chinese (Lewd/Novel style).`;
-            isInteractive = true;
-        } 
-        else if (name === "催眠洗脑") {
-            const intention = prompt("【系统后门已打开】\n你想让那个可怜的角色产生什么错觉？\n(例如：认为自己是我的宠物狗)");
-            if (!intention) { toolOutput.innerHTML = "啧，不敢了吗？"; return; }
-            toolOutput.innerHTML = `<div style="color:#bd00ff;">💉 正在注入污秽思想...</div>`;
-            sysPersona = `[System Mode: Coding Machine]\nTask: Convert intent to a strict SillyTavern [System Note]. Output ONLY the note code.`;
-            specificPrompt = `Intent: "${intention}". Return ONLY: [System Note: ...].`;
-        } 
-        else if (name === "替你回复") {
-            sysPersona = WRITER_PERSONA;
-            specificPrompt = `Generate 3 reply options for the User (Perspective: **First Person "I"**):\n1. [上策] (High EQ/Charming/Erotic) - Best outcome.\n2. [中策] (Normal/Safe) - Average outcome.\n3. [下策] (Stupid/Funny/Troll) - Worst outcome.\nFormat:\n1. [上策] Content...\n2. [中策] Content...\n3. [下策] Content...\nReturn in Chinese.`;
-            isInteractive = true;
-        } 
-        else if (name === "恶作剧推演") {
-            sysPersona = WRITER_PERSONA;
-            specificPrompt = `Based on the plot, suggest 3 actions for the User (**Perspective: First Person "I"**):\n1. [作死/R18] (Suicide/Horny)\n2. [正常] (Boring)\n3. [变态] (Pervert/Fetish)\nOutput in Chinese.`;
-            isInteractive = true;
-        }
-        else if (name === "废物体检报告") {
-            const userMsgs = contextMsg.filter(m => m.name !== 'System' && !m.name.includes('Lilith')).map(m => `[${m.name}]: ${m.message}`).join('\n');
-            if (userMsgs.length < 5) { toolOutput.innerHTML = `<div style="color:#f00">⚠️ 样本太少，没法看。</div>`; return; }
-            toolOutput.innerHTML = `<div style="color:var(--l-main);">📋 正在检查你的性癖...</div>`;
-            specificPrompt = `Analyze 'User'. Toxic report.\n[Format]:\n【📋 雄性生物观察报告】\n> 编号: Loser-${Math.floor(Math.random()*999)}\n> 性癖XP: ...\n> 智商水平: (Mock him)\n> 危险等级: ...\n> 莉莉丝评价: (Be extremely toxic)`;
-            sysPersona = `${getDynamicPersona()}\n${userMsgs}`;
-        } 
-        else if (name === "局势嘲讽") { specificPrompt = "Mock the current situation and the user's performance. Be very rude."; }
-        else if (name === "找茬模式") { specificPrompt = "Find logic holes or stupid behavior. Laugh at them."; }
-        else if (name === "性癖羞辱") { specificPrompt = "Analyze the User's fetish exposed in logs. Kink-shame him hard."; }
-
-        let fullPrompt = `${sysPersona}\n${safeContext}\n${JAILBREAK}\n[COMMAND: ${specificPrompt}]`;
-        let reply = await this.callUniversalAPI(parentWin, fullPrompt, { isChat: false });
-        toolOutput.innerHTML = '';
-
-        if (name === "催眠洗脑" && reply) {
-            const cleanNote = reply.replace(/```/g, '').trim(); 
-            this.sendToSillyTavern(parentWin, cleanNote + "\n", false);
-            toolOutput.innerHTML = `<div style="color:#0f0;">✅ 注入完成</div><div style="font-size:10px; color:#888;">${cleanNote}</div>`;
-            AudioSys.speak("哼，脑子坏掉了吧。"); 
-            UIManager.showBubble("催眠指令已填入。");
-        }
-        else if (isInteractive && reply) {
-            toolOutput.innerHTML = `<div class="tool-result-header">💠 ${name}结果</div><div id="branch-container"></div>`;
-            const container = document.getElementById('branch-container');
-            if (name === "强制福利事件") {
-                 const card = document.createElement('div'); card.className = 'branch-card'; card.style.borderColor = '#ff0055'; card.style.background = 'rgba(255,0,85,0.1)';
-                 card.innerHTML = `<div style="font-size:10px; color:#ff0055">[福利事件]</div><div style="font-size:12px; color:#ddd;">${reply}</div>`;
-                 card.onclick = () => { 
-                     const isAutoSend = userState.autoSend !== false;
-                     this.sendToSillyTavern(parentWin, reply, isAutoSend); 
-                     UIManager.showBubble(isAutoSend ? '已激发随机事件' : '已填入福利事件');
-                 }; 
-                 container.appendChild(card); 
-                 return;
-            }
-            let lines = reply.split('\n').filter(line => /^\d+\./.test(line) || line.includes('[')); 
-            if (lines.length === 0) lines = [reply];
-            lines.forEach(line => {
-                const match = line.match(/\[(.*?)\]\s*(.*)/); 
-                const tag = match ? match[1] : "选项"; 
-                const content = match ? match[2] : line.replace(/^\d+[\.\:\：]\s*/, '').trim();
-                let colorStyle = "border-color: #444;"; let cost = 0; let tagDisplay = tag;
-                if (name === "替你回复") {
-                    if (tag.includes("上策")) { cost = -50; colorStyle = "border-color: #00f3ff; background: rgba(0,243,255,0.1);"; tagDisplay += " (-50FP)"; }
-                    else if (tag.includes("中策")) { cost = -25; colorStyle = "border-color: #00ff00; background: rgba(0,255,0,0.1);"; tagDisplay += " (-25FP)"; }
-                    else if (tag.includes("下策")) { cost = 10; colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);"; tagDisplay += " (+10FP)"; }
-                } else { 
-                    if (tag.includes("作死") || tag.includes("Risk") || tag.includes("色")) colorStyle = "border-color: #ff0055; background: rgba(255,0,85,0.1);"; 
-                    else if (tag.includes("奇怪")) colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);"; 
-                }
-                const card = document.createElement('div'); 
-                card.className = 'branch-card'; 
-                card.style.cssText = `margin-bottom:8px; padding:10px; border:1px solid; border-left-width:4px; cursor:pointer; transition:0.2s; ${colorStyle}`;
-                card.innerHTML = `<div style="font-size:10px; font-weight:bold; color:#aaa; margin-bottom:4px;">[${tagDisplay}]</div><div style="font-size:12px; color:#ddd; line-height:1.4;">${content}</div>`;
-                card.onclick = () => {
-                    card.style.opacity = '0.5'; card.style.transform = 'scale(0.98)';
-                    const isAutoSend = userState.autoSend !== false;
-                    
-                    if (cost !== 0) { 
-                        userState.fatePoints += cost; saveState(); 
-                        const payload = `${content} | /setvar key=fate_points value=${userState.fatePoints}`; 
-                        this.sendToSillyTavern(parentWin, payload, isAutoSend); 
-                        UIManager.showBubble(isAutoSend ? `已执行 (FP: ${cost>0?'+':''}${cost})` : `已填入 (FP: ${cost>0?'+':''}${cost})`); 
-                        UIManager.updateFP(parentWin, userState.fatePoints); 
-                    }
-                    else { 
-                        this.sendToSillyTavern(parentWin, content, isAutoSend); 
-                        UIManager.showBubble(isAutoSend ? `已发送：[${tag}]` : `已填入：[${tag}]`); 
-                    }
-                };
-                container.appendChild(card);
-            });
-        } else {
-            toolOutput.innerHTML = `<div class="tool-result-header">🔰 莉莉丝的评价</div><div class="tool-result-body" style="white-space: pre-wrap;">${(reply||'无数据').replace(/\*\*(.*?)\*\*/g, '<span class="hl">$1</span>')}</div>`;
-            if(name === "废物体检报告") AudioSys.speak("真是一份恶心的报告。");
-        }
+                if (msgBox) msgBox.textContent = "✅ 连接上了";
+            } else { if (msgBox) msgBox.textContent = "⚠️ 啥都没有"; }
+        } catch (e) { console.error(e); if (msgBox) msgBox.textContent = "❌ 烂掉了: " + e.message; }
     }
 };
 

@@ -10,187 +10,193 @@
 
         <hr class="sysHR" />
 
-        <!-- 更新检测设置 -->
-        <div class="settings_section" id="lilith-update-container" style="padding: 5px 0;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap;">
-                <div style="display: flex; align-items: center; gap: 6px; white-space: nowrap;">
-                    <span style="font-weight: bold; font-size: 0.85em; opacity: 0.9;">版本:</span>
-                    <span id="lilith-version-info" style="font-size: 0.85em; opacity: 0.7; font-family: monospace;">v3.0.0</span>
+        <!-- 系统与版本 -->
+        <div class="settings_section">
+            <h4 style="margin: 5px 0; opacity: 0.9;">系统状态</h4>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-weight: bold; font-size: 0.85em;">当前版本:</span>
+                    <span id="lilith-version-info" style="font-size: 0.85em; opacity: 0.7; font-family: monospace;">v3.0.5</span>
                 </div>
-                <button id="lilith-manual-update-btn" class="menu_button" style="margin: 0; display: flex; align-items: center; gap: 4px; padding: 2px 8px; height: 26px; min-width: 80px; font-size: 0.8em; flex-shrink: 0;">
-                    <i class="fa-solid fa-rotate" style="font-size: 0.8em;"></i>
-                    <span>更新插件</span>
-                </button>
+                <button id="lilith-manual-update-btn" class="menu_button" style="margin: 0; padding: 2px 12px; height: 30px; font-size: 0.85em;">检查更新</button>
             </div>
-        </div>
-
-        <hr class="sysHR" />
-
-        <!-- 吐槽频率设置 -->
-        <div class="settings_section">
-            <label for="lilith-comment-frequency">吐槽触发概率 (0-100%):</label>
-            <div class="flex-container alignItemCenter">
-                <input type="range" id="lilith-comment-frequency" min="0" max="100" step="1" style="flex: 1; margin-right: 10px;">
-                <span id="lilith-freq-value" style="min-width: 40px; text-align: right;">0%</span>
-            </div>
-            <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:3px;">
-                决定了莉莉丝监测到你发送消息后，主动回复（吐槽）你的可能性。100% 为每次说话她都会插嘴。
-            </small>
-        </div>
-
-        <!-- 插入位置设置 -->
-        <div class="settings_section">
-            <label for="lilith-comment-mode">吐槽插入位置 (正文互动):</label>
-            <select id="lilith-comment-mode" class="text_pole">
-                <option value="random">AI 自动定位 (智能注入)</option>
-                <option value="bottom">始终追加在末尾</option>
-                <option value="top">始终置于顶端</option>
+            
+            <label for="lilith-persona-select">活动人格切换:</label>
+            <select id="lilith-persona-select" class="text_pole">
+                <option value="toxic">毒舌 (默认)</option>
+                <option value="wife">贤惠</option>
+                <option value="brat">小鬼</option>
+                <option value="imouto">妹妹</option>
+                <option value="meme">模英</option>
             </select>
         </div>
 
         <hr class="sysHR" />
 
-        <!-- [新增] 正文提取设置 -->
+        <!-- 核心逻辑设置 -->
         <div class="settings_section">
-            <h4 style="margin: 5px 0; opacity: 0.9;">正文提取 (Content Extraction)</h4>
+            <h4 style="margin: 5px 0; opacity: 0.9;">核心逻辑</h4>
+            <div style="margin-bottom: 10px;">
+                <label for="lilith-comment-frequency">吐槽触发概率 (0-100%):</label>
+                <div class="flex-container alignItemCenter">
+                    <input type="range" id="lilith-comment-frequency" min="0" max="100" step="1" style="flex: 1; margin-right: 10px;">
+                    <span id="lilith-freq-value" style="min-width: 40px; text-align: right;">0%</span>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 10px;">
+                <label for="lilith-comment-mode">回复插入位置:</label>
+                <select id="lilith-comment-mode" class="text_pole">
+                    <option value="random">自动定位 (智能注入)</option>
+                    <option value="bottom">始终追加在末尾</option>
+                    <option value="top">始终置于顶端</option>
+                </select>
+            </div>
+
+            <div class="flex-container alignItemCenter">
+                <input type="checkbox" id="lilith-auto-send">
+                <label for="lilith-auto-send">智能选项自动发送</label>
+            </div>
+        </div>
+
+        <hr class="sysHR" />
+
+        <!-- OMNI-LINK 看板 -->
+        <div class="settings_section">
+            <h4 style="margin: 5px 0; opacity: 0.9;">全域链路看版</h4>
+            <div class="flex-container alignItemCenter">
+                <input type="checkbox" id="lilith-inject-dashboard">
+                <label for="lilith-inject-dashboard">在 AI 回复末尾注入 OMNI-LINK 看板</label>
+            </div>
+            <div style="margin-top: 5px;">
+                <label for="lilith-dashboard-style">默认视觉风格 (仅全局生效):</label>
+                <select id="lilith-dashboard-style" class="text_pole">
+                    <option value="modern">莉莉丝粉 (默认)</option>
+                    <option value="parchment">古籍羊皮</option>
+                    <option value="ink">泼墨山水</option>
+                    <option value="terminal">矩阵终端</option>
+                    <option value="industrial">重工业风</option>
+                </select>
+            </div>
+        </div>
+
+        <hr class="sysHR" />
+
+        <!-- 内容净化设置 -->
+        <div class="settings_section">
+            <h4 style="margin: 5px 0; opacity: 0.9;">内容净化 (净化正则)</h4>
             
-            <!-- [新增] 正则方案联动 -->
-            <div style="margin-bottom: 10px; background: rgba(0, 243, 255, 0.05); padding: 8px; border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 4px;">
-                <label style="font-size: 0.85em; color: var(--l-cyan); font-weight: bold;">🛡️ 方案管理 (Regex Presets)</label>
+            <div style="margin-bottom: 10px; background: rgba(0, 243, 255, 0.05); padding: 10px; border: 1px solid rgba(0, 243, 255, 0.2); border-radius: 4px;">
+                <label style="font-size: 0.85em; font-weight: bold;">方案预设管理</label>
                 <div class="flex-container alignItemCenter" style="gap: 5px; margin-top: 5px;">
                     <select id="lilith-regex-preset-select" class="text_pole" style="flex: 1; height: 30px;">
-                        <option value="">-- 选择方案 --</option>
+                        <option value="">载入预设...</option>
                     </select>
-                    <button id="lilith-regex-save" class="menu_button" style="width: auto; padding: 0 10px;" title="将当前配置归档为方案">
-                        <i class="fa-solid fa-floppy-disk"></i>
-                    </button>
-                    <button id="lilith-regex-delete" class="menu_button" style="width: auto; padding: 0 10px; color: var(--red);" title="从库中删除此方案">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
+                    <button id="lilith-regex-save" class="menu_button" style="width: auto; padding: 0 10px;">保存预设</button>
+                    <button id="lilith-regex-delete" class="menu_button" style="width: auto; padding: 0 10px; color: #ff5555;">删除</button>
                 </div>
                 <div style="margin-top: 5px; display: none;" id="lilith-regex-name-container">
                     <input type="text" id="lilith-regex-new-name" class="text_pole" placeholder="输入新方案名称..." style="height: 25px; font-size: 0.8em;">
                 </div>
             </div>
 
-            <div class="flex-container alignItemCenter">
-                <input type="checkbox" id="lilith-extraction-enabled">
-                <label for="lilith-extraction-enabled">启用正文提取 (净化Lilith读取的内容)</label>
-            </div>
-            <div style="margin-top: 5px;">
-                <label for="lilith-extraction-regex">前后正则 (用于切掉前后文):</label>
-                <input type="text" id="lilith-extraction-regex" class="text_pole" placeholder="例如: <正文>|</正文> 或 (?s)<think>.*?</think>(.*)">
-                <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:2px;">
-                    规则：设定了前后正则后，Lilith只会读取和吐槽符合规则的内容。<br>
-                    支持简写：&lt;开始标记&gt;|&lt;结束标记&gt; (自动提取中间内容)。
-                </small>
+            <div style="margin-bottom: 10px;">
+                <div class="flex-container alignItemCenter">
+                    <input type="checkbox" id="lilith-extraction-enabled">
+                    <label for="lilith-extraction-enabled">启用正文提取 (切除前后缀)</label>
+                </div>
+                <input type="text" id="lilith-extraction-regex" class="text_pole" placeholder="例如: <正文>|</正文>">
             </div>
 
-            <!-- [新增] 文字替换设置 -->
-            <div style="margin-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.1); padding-top: 10px;">
+            <div style="margin-bottom: 10px;">
                 <div class="flex-container alignItemCenter">
                     <input type="checkbox" id="lilith-text-replacement-enabled">
-                    <label for="lilith-text-replacement-enabled">启用内容替换 (文字正则)</label>
+                    <label for="lilith-text-replacement-enabled">启用文字正则替换</label>
                 </div>
-                <div style="margin-top: 5px;">
-                    <label for="lilith-text-replacement-regex">文字正则 (用于替换内容):</label>
-                    <input type="text" id="lilith-text-replacement-regex" class="text_pole" placeholder="例如: \[|\] 或 \[.*?\]">
-                    <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:2px;">
-                        规则：被匹配到的内容会被“替换为”中的内容取代。<br>
-                        支持简写：A|B (自动匹配A...B之间的内容，如 [|] 匹配 [动作])。
-                    </small>
-                </div>
-                <div style="margin-top: 5px;">
-                    <label for="lilith-text-replacement-string">替换为 (留空则删除):</label>
-                    <input type="text" id="lilith-text-replacement-string" class="text_pole" placeholder="">
+                <div style="display: flex; gap: 5px;">
+                    <input type="text" id="lilith-text-replacement-regex" class="text_pole" placeholder="需替换的正则" style="flex: 2;">
+                    <input type="text" id="lilith-text-replacement-string" class="text_pole" placeholder="替换为..." style="flex: 1;">
                 </div>
             </div>
             
-            <div style="margin-top:10px; border: 1px solid var(--SmartThemeBorderColor); padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.2);">
-                <label style="font-weight:bold;">正则测试区</label>
-                <textarea id="lilith-extraction-test-input" class="text_pole" rows="3" placeholder="在此输入测试文本..." style="margin:5px 0; width:100%; box-sizing:border-box;"></textarea>
-                <div class="flex-container">
-                     <button id="lilith-extraction-test-btn" class="menu_button" style="width: auto; padding: 5px 15px;">测试提取</button>
-                </div>
-                <div style="margin-top:5px;">
-                    <label>提取结果:</label>
-                    <div id="lilith-extraction-test-result" style="background:var(--SmartThemeInputBackground); color:var(--SmartThemeBodyColor); padding:5px; min-height:20px; white-space: pre-wrap; border-radius:4px; border: 1px solid var(--SmartThemeBorderColor); font-family: monospace;"></div>
-                </div>
+            <div style="margin-top:10px; border: 1px solid var(--SmartThemeBorderColor); padding: 8px; border-radius: 4px; background: rgba(0,0,0,0.1);">
+                <label style="font-weight:bold; font-size: 0.85em;">净化效果测试</label>
+                <textarea id="lilith-extraction-test-input" class="text_pole" rows="2" placeholder="输入测试文本..." style="margin:5px 0; width:100%; box-sizing:border-box;"></textarea>
+                <button id="lilith-extraction-test-btn" class="menu_button" style="width: 100%;">运行测试</button>
+                <div id="lilith-extraction-test-result" style="margin-top:8px; background: rgba(0,0,0,0.2); font-size: 0.85em; padding: 5px; border-radius: 4px; border: 1px dashed rgba(255,255,255,0.1); min-height: 20px; font-family: monospace;"></div>
             </div>
         </div>
 
         <hr class="sysHR" />
 
-        <!-- 莉莉丝的大脑皮层 -->
-        <div class="settings_section" style="border: 1px solid rgba(189, 0, 255, 0.1); padding: 8px; border-radius: 4px;">
-            <h4 style="margin: 5px 0; opacity: 0.9; color: #bd00ff;">🧠 莉莉丝的大脑皮层</h4>
+        <!-- 大脑皮层与动态生成 -->
+        <div class="settings_section">
+            <h4 style="margin: 5px 0; opacity: 0.9; color: #bd00ff;">大脑皮层 (AI 动态内容)</h4>
             <div class="flex-container alignItemCenter">
                 <input type="checkbox" id="lilith-dynamic-enabled">
-                <label for="lilith-dynamic-enabled">启用 AI 自动生成动态对话与事件</label>
+                <label for="lilith-dynamic-enabled">启用实时构思 (自动生成对话与事件)</label>
             </div>
-            <div style="margin-top: 5px;">
-                <label for="lilith-dynamic-interval">生成间隔 (分钟):</label>
-                <input type="number" id="lilith-dynamic-interval" class="text_pole" min="1" max="4320" step="1">
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85em;">运行间隔 (分钟)</label>
+                    <input type="number" id="lilith-dynamic-interval" class="text_pole" min="1" max="4320">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 0.85em;">单次构思条数</label>
+                    <input type="number" id="lilith-dynamic-count" class="text_pole" min="1" max="20">
+                </div>
             </div>
-            <div style="margin-top: 5px;">
-                <label for="lilith-dynamic-count">每次生成条数 (建议 20 以内):</label>
-                <input type="number" id="lilith-dynamic-count" class="text_pole" min="1" max="20" step="1">
-                <small style="opacity:0.6; font-size: 0.75em; display:block;">
-                    (1条:纯对话 | 2-9条:1事件 | 10条+:每5条1个事件)
-                </small>
+
+            <div style="margin-top: 10px;">
+                <label for="lilith-dynamic-trigger-chance">活跃度权重 (0-100%):</label>
+                <input type="range" id="lilith-dynamic-trigger-chance" min="0" max="100" step="5">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75em; opacity: 0.6;">
+                    <span>低频触发</span>
+                    <span id="lilith-dyn-trigger-val">100%</span>
+                    <span>极高活跃</span>
+                </div>
             </div>
-            <div style="margin-top: 5px;">
-                <label for="lilith-dynamic-trigger-chance">事件触发概率 (1-100%):</label>
-                <input type="number" id="lilith-dynamic-trigger-chance" class="text_pole" min="1" max="100" step="1">
+
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <button id="lilith-force-generate-dynamic" class="menu_button" style="flex: 1;">立即构思内容</button>
+                <button id="lilith-test-dynamic-trigger" class="menu_button" style="flex: 1;">手动触发测试</button>
             </div>
-            <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:3px;">
-                触发活跃度。设定为 100% 时，莉莉丝将努力在下一个生成周期到来前，把你目前大脑皮层中所有的对话和事件全部展示一遍。
-            </small>
-            <div style="margin-top: 10px; display: flex; gap: 5px;">
-                <button id="lilith-force-generate-dynamic" class="menu_button" style="flex: 2;">
-                    <i class="fa-solid fa-wand-sparkles"></i> 重新生成内容
-                </button>
-                <button id="lilith-test-dynamic-trigger" class="menu_button" style="flex: 1; border-color: var(--l-cyan);">
-                    <i class="fa-solid fa-vial"></i> 测试触发
-                </button>
-            </div>
-            <small style="opacity:0.7; font-size: 0.8em; display:block; margin-top:5px;">
-                此功能会根据当前好感度和理智值，自动构思专属的对话和随机事件。
-            </small>
         </div>
 
         <hr class="sysHR" />
 
-        <!-- 开关选项 -->
-        <div class="settings_section flex-container alignItemCenter">
-            <input type="checkbox" id="lilith-hide-avatar">
-            <label for="lilith-hide-avatar">隐藏右下角看板娘 (仅保留正文渲染)</label>
-        </div>
-        
-        <div class="settings_section flex-container alignItemCenter">
-            <input type="checkbox" id="lilith-auto-send">
-            <label for="lilith-auto-send">自动发送选择 (点选"替你回复"等内容后直接发送)</label>
-        </div>
-
-        <div class="settings_section flex-container" style="gap:10px; margin-top: 10px;">
-            <button id="lilith-reset-pos" class="menu_button" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <i class="fa-solid fa-location-arrow"></i> 重置位置
-            </button>
-            <button id="lilith-toggle-panel" class="menu_button" style="flex:1; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <i class="fa-solid fa-window-maximize"></i> 开关面版
-            </button>
-        </div>
-
+        <!-- 视觉展示与安全 -->
         <div class="settings_section">
-            <label for="lilith-avatar-size">看板娘显示尺寸 (px):</label>
-            <input type="number" id="lilith-avatar-size" class="text_pole" min="50" max="500" step="10">
+            <h4 style="margin: 5px 0; opacity: 0.9;">界面展示与安全</h4>
+            
+            <div class="flex-container alignItemCenter">
+                <input type="checkbox" id="lilith-hide-avatar">
+                <label for="lilith-hide-avatar">隐藏全屏挂件 (仅保留正文渲染)</label>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <div style="flex: 2;">
+                    <label style="font-size: 0.85em;">挂件尺寸 (px)</label>
+                    <input type="number" id="lilith-avatar-size" class="text_pole" min="50" max="500">
+                </div>
+                <div style="flex: 3;">
+                    <label style="font-size: 0.85em;">锁定延迟 (分钟)</label>
+                    <input type="number" id="lilith-auto-lock" class="text_pole" min="0" max="1440">
+                </div>
+            </div>
+
+            <div style="margin-top: 15px; display: flex; gap: 5px;">
+                <button id="lilith-reset-pos" class="menu_button" style="flex: 1;">重置锚点位置</button>
+                <button id="lilith-toggle-panel" class="menu_button" style="flex: 1;">展开面板</button>
+            </div>
         </div>
 
         <hr class="sysHR" />
 
         <div class="settings_section">
-            <button id="lilith-reset-state" class="menu_button" style="color: #ff5555; border-color: rgba(255, 85, 85, 0.3); width: 100%; display:flex; align-items:center; justify-content:center; gap:5px;">
-                <i class="fa-solid fa-triangle-exclamation"></i> 危险：清空好感度与记忆
+            <button id="lilith-reset-state" class="menu_button" style="color: #ff5555; border-color: rgba(255, 85, 85, 0.3); width: 100%;">
+                危险：清空好感度与所有记忆
             </button>
         </div>
     </div>

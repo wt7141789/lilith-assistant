@@ -45,6 +45,13 @@ export function validateState() {
             avatarSize: DEFAULT_STATE.avatarSize || 150,
             commentFrequency: DEFAULT_STATE.commentFrequency || 50,
             autoSend: (settings.global && settings.global.autoSend !== undefined) ? settings.global.autoSend : true,
+            injectSTContext: (settings.global && settings.global.injectSTContext !== undefined) ? settings.global.injectSTContext : (DEFAULT_STATE.injectSTContext !== undefined ? DEFAULT_STATE.injectSTContext : true),
+            injectDashboard: (settings.global && settings.global.injectDashboard !== undefined) ? settings.global.injectDashboard : DEFAULT_STATE.injectDashboard,
+            dashboardStyle: (settings.global && settings.global.dashboardStyle !== undefined) ? settings.global.dashboardStyle : (DEFAULT_STATE.dashboardStyle || 'modern'),
+            autoLockTimeout: settings.global.autoLockTimeout !== undefined ? settings.global.autoLockTimeout : DEFAULT_STATE.autoLockTimeout,
+            lockPasswordEnabled: settings.global.lockPasswordEnabled !== undefined ? settings.global.lockPasswordEnabled : (DEFAULT_STATE.lockPasswordEnabled || false),
+            lockPassword: settings.global.lockPassword !== undefined ? settings.global.lockPassword : (DEFAULT_STATE.lockPassword || ''),
+            checkConsistency: settings.global.checkConsistency !== undefined ? settings.global.checkConsistency : (DEFAULT_STATE.checkConsistency || true),
             extractionEnabled: DEFAULT_STATE.extractionEnabled || false,
             extractionRegex: DEFAULT_STATE.extractionRegex || '',
             dynamicContentEnabled: DEFAULT_STATE.dynamicContentEnabled !== false,
@@ -62,7 +69,7 @@ export function validateState() {
     if (!settings.global.apiConfig) settings.global.apiConfig = { ...DEFAULT_STATE.apiConfig };
     if (!settings.global.apiPresets) settings.global.apiPresets = [];
 
-    // [New v3.0.0] Ensure dynamic content settings exist
+    // [New v3.0.5] Ensure dynamic content settings exist
     if (settings.global.dynamicContentEnabled === undefined) settings.global.dynamicContentEnabled = true;
     
     // 强制修正旧版的 240 默认值到 20
@@ -127,7 +134,8 @@ export function saveState(updateUICallback) {
         'panelWidth', 'panelHeight', 'commentFrequency', 'commentMode',
         'extractionEnabled', 'extractionRegex', 'textReplacementEnabled', 
         'textReplacementRegex', 'textReplacementString', 'apiConfig', 'apiPresets',
-        'regexPresets', 'dynamicContentEnabled', 'dynamicContentInterval', 'dynamicContentCount'
+        'regexPresets', 'dynamicContentEnabled', 'dynamicContentInterval', 'dynamicContentCount',
+        'injectSTContext', 'injectDashboard', 'dashboardStyle', 'muted'
     ];
     
     // 1. Sync per-persona data (Favor, Sanity, Memory, etc.)

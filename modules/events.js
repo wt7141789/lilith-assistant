@@ -42,6 +42,8 @@ export const EventManager = {
                                 if (allMes.length > 0) el = allMes[allMes.length - 1];
                             }
                             if (el) UIManager.applyLilithFormatting(el);
+                            // 注入全域看板
+                            if (!UIManager.isLocked) UIManager.injectEmbeddedDashboard();
                         }, 100);
                     });
                 }
@@ -49,21 +51,32 @@ export const EventManager = {
 
             // Initial full scan for existing messages
             setTimeout(() => {
+                if (UIManager.isLocked) return;
                 console.log('[Lilith] Scanning initial messages...');
                 document.querySelectorAll('.mes').forEach(el => UIManager.applyLilithFormatting(el));
+                UIManager.injectEmbeddedDashboard();
             }, 1000);
 
             // 2. Generation Ended Hook (AI Interjection / Commenting)
             eventSource.on(event_types.GENERATION_ENDED, async () => {
+                if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止响应
                 const currentChat = SillyTavern.getContext().chat;
                 if (!currentChat || currentChat.length === 0) return;
+
+                // 确保新生成结束后刷新看板位置及数据
+                const innerContainer = document.querySelector('.inner-world-container');
+                if (innerContainer) {
+                    InnerWorldManager.render(innerContainer, UIManager.showBubble.bind(UIManager), UIManager.showStatusChange.bind(UIManager));
+                }
+                UIManager.injectEmbeddedDashboard();
 
                 const lastMsg = currentChat[currentChat.length - 1];
                 if (!lastMsg) return;
 
-                // Update Lilith's expression based on the AI's response
+                // Update Lilith's expression based on the AI's response (Optimized via Regex if enabled)
                 if (!lastMsg.is_user && !lastMsg.is_system && lastMsg.mes) {
-                    UIManager.updateAvatarExpression(lastMsg.mes);
+                    const optimizedContent = extractContent(lastMsg.mes, userState);
+                    UIManager.updateAvatarExpression(optimizedContent);
                 }
 
                 const messageId = lastMsg.message_id || lastMsg.mesid || (currentChat.length - 1);
@@ -90,24 +103,58 @@ export const EventManager = {
                 }
             });
 
-            // 4. MutationObserver for dynamic message loading (Fallback)
+            // 5. Database Update Listener (ACU Sync)
+            window.addEventListener('acu:data_updated', () => {
+                if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止UI刷新
+                console.log('[Lilith] Global Database Update Detected -> Refreshing UI');
+                
+                // 刷新主控制窗 (如果开启)
+                const innerContainer = document.querySelector('.inner-world-container');
+                if (innerContainer) {
+                    InnerWorldManager.render(innerContainer, UIManager.showBubble.bind(UIManager), UIManager.showStatusChange.bind(UIManager));
+                }
+                
+                // 刷新全域链路概览
+                UIManager.injectEmbeddedDashboard();
+            });
+
+            // 4. MutationObserver for dynamic message loading & Dashboard Persistence
             const chatObserver = new MutationObserver((mutations) => {
+                if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止DOM扫描
+                let shouldInject = false;
                 mutations.forEach(mutation => {
                     mutation.addedNodes.forEach(node => {
                         if (node.nodeType === 1) {
                             if (node.classList.contains('mes')) {
                                 UIManager.applyLilithFormatting(node);
+                                shouldInject = true;
                             } else {
                                 const mesElem = node.querySelector('.mes');
-                                if (mesElem) UIManager.applyLilithFormatting(mesElem);
+                                if (mesElem) {
+                                    UIManager.applyLilithFormatting(mesElem);
+                                    shouldInject = true;
+                                }
                             }
                         }
                     });
+
+                    // 如果消息内容变化（例如在流式传输或被其他脚本修改），确保链路概览还在
+                    if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                        const target = mutation.target.closest ? mutation.target.closest('.mes') : (mutation.target.parentElement?.closest ? mutation.target.parentElement.closest('.mes') : null);
+                        if (target && target === document.querySelector('.mes:last-child')) {
+                            shouldInject = true;
+                        }
+                    }
                 });
+
+                if (shouldInject) {
+                    if (this._dashTimeout) clearTimeout(this._dashTimeout);
+                    this._dashTimeout = setTimeout(() => UIManager.injectEmbeddedDashboard(), 200);
+                }
             });
             const chatContainer = document.getElementById('chat');
             if (chatContainer) {
-                chatObserver.observe(chatContainer, { childList: true, subtree: true });
+                chatObserver.observe(chatContainer, { childList: true, subtree: true, characterData: true });
             }
 
             // 5. Global Message Card Clicks (Replay Audio)

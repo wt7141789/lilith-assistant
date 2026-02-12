@@ -5,7 +5,7 @@
 
 export const UpdateManager = {
     // Current version - detected from manifest.json on init
-    localVersion: "2.5.9",
+    localVersion: "3.0.5",
     // Remote manifest URL
     remoteUrl: "https://raw.githubusercontent.com/wt7141789/lilith-assistant/main/manifest.json",
     

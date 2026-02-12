@@ -53,10 +53,16 @@ export const UIManager = {
 
     updateAvatarStyle() {
         const av = document.getElementById(avatarId);
+        const wrapper = document.getElementById(containerId);
         if (!av) return;
         av.style.display = userState.hideAvatar ? 'none' : 'block';
         av.style.width = userState.avatarSize + 'px';
         av.style.height = userState.avatarSize + 'px';
+        
+        // 同步 CSS 变量，确保气泡定位随球体大小自动调整
+        if (wrapper) {
+            wrapper.style.setProperty('--l-avatar-size', userState.avatarSize + 'px');
+        }
     },
 
     setLoadingState(isLoading) {
@@ -93,6 +99,22 @@ export const UIManager = {
         glitchLayer.id = 'lilith-glitch-layer'; 
         glitchLayer.className = 'screen-glitch-layer'; 
         document.body.appendChild(glitchLayer);
+
+        // --- [新增] 点击/触摸停止特效 ---
+        const dismissGlitch = () => {
+            if (glitchLayer.style.opacity !== '0') {
+                glitchLayer.style.opacity = '0';
+                glitchLayer.classList.remove('glitch-active');
+                // 设置一个临时标记，让 heartbeat 短时间内不要再触发
+                window.lilithGlitchDismissedUntil = Date.now() + 30000; // 30秒内不再自动开启
+                console.log('[Lilith] 特效已手动清除，30秒内不再自动触发');
+            }
+        };
+        glitchLayer.addEventListener('click', dismissGlitch);
+        glitchLayer.addEventListener('touchstart', (e) => {
+            // 兼容移动端
+            dismissGlitch();
+        }, { passive: true });
         
         const wrapper = document.createElement('div'); 
         wrapper.id = containerId; 
@@ -126,11 +148,11 @@ export const UIManager = {
         const muteIcon = AudioSys.muted ? '🔇' : '🔊';
         panel.innerHTML = `
             <div class="lilith-panel-header">
-                <span class="lilith-title">LILITH ASSISTANT <span style="font-size:10px; color:var(--l-cyan);">v3.0.0 PRO</span></span>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span id="lilith-world-toggle" title="切入里世界" style="cursor:pointer; font-size:14px;">${userState.isInnerWorld ? '🌟' : '👁️'}</span>
-                    <span id="lilith-mute-btn" title="语音开关" style="cursor:pointer; font-size:14px;">${muteIcon}</span>
-                    <div style="text-align:right; line-height:1;">
+                <span class="lilith-title">莉莉丝助手 (LILITH ASSISTANT) <span style="font-size:10px; color:var(--l-cyan);">v3.0.5 专业版 (PRO)</span></span>
+                    <div style="display:flex; align-items:center; gap:12px; padding: 5px;">
+                        <span id="lilith-world-toggle" title="触达莉莉丝的最核心" style="cursor:pointer; font-size:18px; padding: 4px; display: inline-block;">${userState.isInnerWorld ? '🌟' : '👁️'}</span>
+                        <span id="lilith-mute-btn" title="语音开关" style="cursor:pointer; font-size:18px; padding: 4px; display: inline-block;">${muteIcon}</span>
+                        <div style="text-align:right; line-height:1; margin-left: 4px;">
                         <div class="stat-row" style="color:#ff0055">好感 <span id="favor-val">${userState.favorability}</span></div>
                         <div class="stat-row" style="color:#00e5ff">理智 <span id="sanity-val">${userState.sanity}</span></div>
                     </div>
@@ -220,6 +242,19 @@ export const UIManager = {
                             ${Object.keys(PERSONA_DB).map(k => `<option value="${k}" ${userState.activePersona===k?'selected':''}>${PERSONA_DB[k].name}</option>`).join('')}
                         </select>
                     </div>
+
+                    <div class="cfg-group">
+                        <label style="color:var(--l-cyan); font-weight:bold;">🔗 链路注入设置 (Injection)</label>
+                        <div style="display:flex; align-items:center;">
+                            <input type="checkbox" id="cfg-inject-st" ${userState.injectSTContext !== false ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
+                            <span style="font-size:12px; color:#ccc;">注入酒馆原始聊天记录 (Context)</span>
+                        </div>
+                        <small style="color:#666; font-size:9px; display:block; margin-top:2px;">
+                            开启后：莉莉丝能感知到你当前的对话背景和角色设定。<br>
+                            关闭后：莉莉丝将“两耳不闻窗外事”，仅根据预设和发给她的内容自由发挥。
+                        </small>
+                    </div>
+
                     <div class="cfg-group">
                         <label style="color:#ff0055; font-weight:bold;">💬 吐槽设定 (Interjection)</label>
                         <div style="font-size:10px; color:#888;">吐槽概率: <span id="cfg-freq-val">${userState.commentFrequency || 30}</span>%</div>
@@ -238,38 +273,38 @@ export const UIManager = {
                     
                     <div class="cfg-group">
                         <label style="color:#00f3ff;">🎛️ 语音调校 (TTS)</label>
-                        <div style="font-size:10px; color:#888;">音调 (Pitch): <span id="tts-pitch-val">${userState.ttsConfig ? userState.ttsConfig.pitch : 1.2}</span></div>
+                        <div style="font-size:10px; color:#888;">音频音调 (Pitch): <span id="tts-pitch-val">${userState.ttsConfig ? userState.ttsConfig.pitch : 1.2}</span></div>
                         <input type="range" id="tts-pitch" min="0.1" max="2.0" step="0.1" value="${userState.ttsConfig ? userState.ttsConfig.pitch : 1.2}">
                         
-                        <div style="font-size:10px; color:#888; margin-top:5px;">语速 (Speed): <span id="tts-rate-val">${userState.ttsConfig ? userState.ttsConfig.rate : 1.3}</span></div>
+                        <div style="font-size:10px; color:#888; margin-top:5px;">播放语速 (Speed): <span id="tts-rate-val">${userState.ttsConfig ? userState.ttsConfig.rate : 1.3}</span></div>
                         <input type="range" id="tts-rate" min="0.5" max="2.0" step="0.1" value="${userState.ttsConfig ? userState.ttsConfig.rate : 1.3}">
                         
-                        <button id="tts-test-btn" style="width:100%; margin-top:5px; background:#333; color:#fff; border:none; padding:3px; cursor:pointer; font-size:10px;">🔊 试听</button>
+                        <button id="tts-test-btn" style="width:100%; margin-top:5px; background:#333; color:#fff; border:none; padding:3px; cursor:pointer; font-size:10px;">🔊 发声测试</button>
                     </div>
 
                     <div class="cfg-group">
                         <label style="color:#bd00ff; font-weight:bold;">🧠 莉莉丝的大脑皮层</label>
                         <div style="display:flex; align-items:center;">
                             <input type="checkbox" id="cfg-dynamic-enable" ${userState.dynamicContentEnabled !== false ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
-                            <span style="font-size:12px; color:#ccc;">启用 AI 动态更新</span>
+                            <span style="font-size:12px; color:#ccc;">启用 AI 动态更新功能</span>
                         </div>
-                        <div style="font-size:10px; color:#888; margin-top:5px;">生成间隔 (分钟):</div>
+                        <div style="font-size:10px; color:#888; margin-top:5px;">内容生成间隔 (分钟):</div>
                         <input type="number" id="cfg-dyn-interval" class="lilith-input" min="1" max="4320" step="1" value="${userState.dynamicContentInterval || 20}" style="width: 100%; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; padding: 4px; font-size: 12px;">
                         
-                        <div style="font-size:10px; color:#888; margin-top:5px;">每次生成数:</div>
+                        <div style="font-size:10px; color:#888; margin-top:5px;">单次构思数量:</div>
                         <input type="number" id="cfg-dyn-count" class="lilith-input" min="1" max="20" step="1" value="${userState.dynamicContentCount || 6}" style="width: 100%; box-sizing: border-box; background: #111; color: #fff; border: 1px solid #444; padding: 4px; font-size: 12px;">
                         <small style="color:#666; font-size:9px; display:block; margin-top:2px;">
-                            (1条:纯对话 | 2-9条:1事件 | 10条+:每5条1事件)<br>
-                            *建议保持在 20 条以内以确保 AI 构思质量。
+                            (1条:纯对话 | 2-9条:1事件 | 10条+:每5条1个事件)<br>
+                            *建议保持在 20 条以内，以确保 AI 构思的多样性。
                         </small>
                         
-                        <div style="font-size:10px; color:#888; margin-top:5px;">触发概率: <span id="cfg-dyn-trigger-val">${userState.dynamicContentTriggerChance || 100}</span>%</div>
+                        <div style="font-size:10px; color:#888; margin-top:5px;">事件触发概率: <span id="cfg-dyn-trigger-val">${userState.dynamicContentTriggerChance || 100}</span>%</div>
                         <input type="range" id="cfg-dyn-trigger" min="1" max="100" step="1" value="${userState.dynamicContentTriggerChance || 100}" style="accent-color:var(--l-cyan); width:100%;" oninput="document.getElementById('cfg-dyn-trigger-val').textContent = this.value">
-                        <small style="color:#666; font-size:9px; display:block; margin-top:2px;">调整触发频率。100% 意味着在生成间隔内莉莉丝基本能把构思好的内容全部触发完。</small>
+                        <small style="color:#666; font-size:9px; display:block; margin-top:2px;">调整活跃度频率。100% 意味着莉莉丝会更积极地展示她脑海中的内容。</small>
 
                         <div style="display: flex; gap: 5px; margin-top: 5px;">
-                            <button id="cfg-dyn-force" style="flex: 2; background:#333; color:#fff; border:none; padding:3px; cursor:pointer; font-size:10px;">⚡ 立即重构</button>
-                            <button id="cfg-dyn-test" style="flex: 1; background:#222; color:var(--l-cyan); border:1px solid var(--l-cyan); padding:3px; cursor:pointer; font-size:10px;">🧪 测试</button>
+                            <button id="cfg-dyn-force" style="flex: 2; background:#333; color:#fff; border:none; padding:3px; cursor:pointer; font-size:10px;">⚡ 强制重构皮层</button>
+                            <button id="cfg-dyn-test" style="flex: 1; background:#222; color:var(--l-cyan); border:1px solid var(--l-cyan); padding:3px; cursor:pointer; font-size:10px;">🧪 触发测试</button>
                         </div>
                     </div>
 
@@ -341,12 +376,28 @@ export const UIManager = {
                             </div>
                             <div style="display:flex; align-items:center;">
                                 <input type="checkbox" id="cfg-auto-send" ${userState.autoSend !== false ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
-                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-auto-send').click()">自动发送选择</span>
+                                <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-auto-send').click()">自动发送</span>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:10px;">
                             <span style="font-size:12px; color:#ccc; white-space:nowrap;">球体大小: <span id="cfg-size-val">${userState.avatarSize}</span>px</span>
                             <input type="range" id="cfg-avatar-size" min="50" max="300" step="10" value="${userState.avatarSize}" style="flex:1; accent-color:var(--l-main);" oninput="document.getElementById('cfg-size-val').textContent = this.value">
+                        </div>
+                        <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
+                            <span style="font-size:12px; color:#ccc; white-space:nowrap;">自动锁定 (分):</span>
+                            <input type="number" id="cfg-auto-lock" min="0" max="1440" step="1" value="${userState.autoLockTimeout || 0}" style="flex:1; background:#111; color:#fff; border:1px solid #444; padding:2px 5px; font-size:12px; border-radius:2px;">
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px; margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:8px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <div style="display:flex; align-items:center;">
+                                    <input type="checkbox" id="cfg-lock-pwd-enable" ${userState.lockPasswordEnabled ? 'checked' : ''} style="width:auto; margin-right:5px;"> 
+                                    <span style="font-size:12px; color:#ccc; cursor:pointer;" onclick="document.getElementById('cfg-lock-pwd-enable').click()">启用锁定密码</span>
+                                </div>
+                                <button id="cfg-lock-pwd-set" class="tool-btn" style="padding:2px 8px; font-size:10px; border-color:var(--l-gold); color:var(--l-gold);">修改密码</button>
+                            </div>
+                            <div id="cfg-lock-pwd-display" style="font-size:10px; color:#666; font-style:italic;">
+                                ${userState.lockPasswordEnabled ? (userState.lockPassword ? '密码已设置' : '<span style="color:#ff0055">密码未设置，启用将无效</span>') : '锁定后点击任意处即可恢复'}
+                            </div>
                         </div>
                         <button id="cfg-reset-pos" style="width:100%; margin-top:12px; background:rgba(255,255,255,0.05); color:#00f3ff; border:1px solid #00f3ff66; padding:5px; cursor:pointer; font-size:11px; border-radius:4px; display:flex; align-items:center; justify-content:center; gap:5px;">
                             <i class="fa-solid fa-location-crosshairs"></i> 修正位置偏移
@@ -361,7 +412,7 @@ export const UIManager = {
                     <div id="cfg-msg" style="font-size:10px; color:#aaa; margin-top:5px;"></div>
                 </div>
             </div>
-            <div id="lilith-inner-world" class="lilith-page" style="${userState.isInnerWorld ? 'display:flex;' : 'display:none;'} background: rgba(0,0,0,0.8); flex-direction: column; overflow-y: auto; height: 100%; padding: 10px;">
+            <div id="lilith-inner-world" class="lilith-page" style="${userState.isInnerWorld ? 'display:flex;' : 'display:none;'} background: rgba(0,0,0,0.8); flex-direction: column; overflow: hidden; flex: 1; padding: 0; min-height: 0; position: relative !important; height: auto !important;">
             </div>
             <div class="lilith-resize-handle"></div>
         `;
@@ -397,17 +448,25 @@ export const UIManager = {
         // Mute
         const muteBtn = document.getElementById('lilith-mute-btn');
         if (muteBtn) {
-            muteBtn.addEventListener('click', () => {
-                AudioSys.muted = !AudioSys.muted;
-                muteBtn.textContent = AudioSys.muted ? '🔇' : '🔊';
+            ['click', 'touchstart'].forEach(evt => {
+                muteBtn.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    AudioSys.muted = !AudioSys.muted;
+                    muteBtn.textContent = AudioSys.muted ? '🔇' : '🔊';
+                });
             });
         }
 
         // World Toggle
         const worldToggle = document.getElementById('lilith-world-toggle');
         if (worldToggle) {
-            worldToggle.addEventListener('click', () => {
-                this.toggleWorld();
+            ['click', 'touchstart'].forEach(evt => {
+                worldToggle.addEventListener(evt, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleWorld();
+                });
             });
         }
     },
@@ -935,6 +994,29 @@ export const UIManager = {
                  this.showBubble("配置已覆盖由神经中枢...", "#0f0");
             });
 
+            // Lock Password Logic
+            document.getElementById('cfg-lock-pwd-enable')?.addEventListener('change', (e) => {
+                userState.lockPasswordEnabled = e.target.checked;
+                saveState();
+                const display = document.getElementById('cfg-lock-pwd-display');
+                if (display) {
+                    display.innerHTML = userState.lockPasswordEnabled ? 
+                        (userState.lockPassword ? '密码已设置' : '<span style="color:#ff0055">密码未设置，启用将无效</span>') : 
+                        '锁定后点击任意处即可恢复';
+                }
+            });
+
+            document.getElementById('cfg-lock-pwd-set')?.addEventListener('click', () => {
+                const pwd = prompt("请输入新的解锁密码 (留空则取消密码保护):");
+                if (pwd !== null) {
+                    userState.lockPassword = pwd.trim();
+                    if (!userState.lockPassword) userState.lockPasswordEnabled = false;
+                    saveState();
+                    this.updateUI(); // Refresh UI to update displays
+                    this.showBubble(userState.lockPassword ? "解锁密码已更新" : "密码保护已停用", "var(--l-gold)");
+                }
+            });
+
              // Buttons - Get Models
              document.getElementById('cfg-get-models')?.addEventListener('click', () => assistant.fetchModels());
         };
@@ -953,7 +1035,7 @@ export const UIManager = {
             const stDisplay = document.querySelector('.lilith-comment-frequency-val');
             if(valDisplay) valDisplay.textContent = val;
             if(stDisplay) stDisplay.textContent = val;
-            saveExtensionSettings();
+            saveState();
         };
 
         if (cfgFreq) cfgFreq.addEventListener('input', () => syncFreq(cfgFreq.value));
@@ -967,7 +1049,7 @@ export const UIManager = {
             userState.commentMode = val;
             if (cfgMode) cfgMode.value = val;
             if (stMode) stMode.value = val;
-            saveExtensionSettings();
+            saveState();
         };
 
         if (cfgMode) cfgMode.addEventListener('change', () => syncMode(cfgMode.value));
@@ -980,7 +1062,7 @@ export const UIManager = {
                 if (!userState.ttsConfig) userState.ttsConfig = { pitch: 1.0, rate: 1.0 };
                 userState.ttsConfig.pitch = parseFloat(ttsPitch.value);
                 document.getElementById('tts-pitch-val').textContent = userState.ttsConfig.pitch;
-                saveExtensionSettings();
+                saveState();
             });
         }
         const ttsRate = document.getElementById('tts-rate');
@@ -989,7 +1071,7 @@ export const UIManager = {
                 if (!userState.ttsConfig) userState.ttsConfig = { pitch: 1.0, rate: 1.0 };
                 userState.ttsConfig.rate = parseFloat(ttsRate.value);
                 document.getElementById('tts-rate-val').textContent = userState.ttsConfig.rate;
-                saveExtensionSettings();
+                saveState();
             });
         }
         document.getElementById('tts-test-btn')?.addEventListener('click', () => {
@@ -997,6 +1079,11 @@ export const UIManager = {
         });
 
         // Dynamic Content
+        document.getElementById('cfg-inject-st')?.addEventListener('change', (e) => {
+            userState.injectSTContext = e.target.checked;
+            saveState();
+        });
+
         document.getElementById('cfg-dynamic-enable')?.addEventListener('change', (e) => {
             userState.dynamicContentEnabled = e.target.checked;
             saveState();
@@ -1042,7 +1129,7 @@ export const UIManager = {
             if(valDisplay) valDisplay.textContent = val;
             if(stDisplay) stDisplay.textContent = val;
             this.updateAvatarStyle();
-            saveExtensionSettings();
+            saveState();
         };
 
         if (cfgSize) cfgSize.addEventListener('input', () => syncSize(cfgSize.value));
@@ -1057,7 +1144,7 @@ export const UIManager = {
             if (cfgHide) cfgHide.checked = checked;
             if (stHide) stHide.checked = checked;
             this.updateAvatarStyle();
-            saveExtensionSettings();
+            saveState();
         };
 
         if (cfgHide) cfgHide.addEventListener('change', () => syncHide(cfgHide.checked));
@@ -1072,7 +1159,7 @@ export const UIManager = {
             const $stAutoSend = $('#lilith-auto-send');
             if ($stAutoSend.length) $stAutoSend.prop('checked', checked);
             else if (stAutoSend) stAutoSend.checked = checked;
-            saveExtensionSettings();
+            saveState();
         };
         if (cfgAutoSend) cfgAutoSend.addEventListener('change', () => syncAutoSend(cfgAutoSend.checked));
         if (stAutoSend) stAutoSend.addEventListener('change', () => syncAutoSend(stAutoSend.checked));
@@ -1090,7 +1177,7 @@ export const UIManager = {
             const $stExtract = $('#lilith-extraction-enabled');
             if ($stExtract.length) $stExtract.prop('checked', checked);
             else if (stExtract) stExtract.checked = checked;
-            saveExtensionSettings();
+            saveState();
         };
 
         const syncRepl = (checked) => {
@@ -1099,7 +1186,7 @@ export const UIManager = {
             const $stRepl = $('#lilith-text-replacement-enabled');
             if ($stRepl.length) $stRepl.prop('checked', checked);
             else if (stRepl) stRepl.checked = checked;
-            saveExtensionSettings();
+            saveState();
         };
 
         if (cfgExtract) cfgExtract.addEventListener('change', () => syncExtract(cfgExtract.checked));
@@ -1128,6 +1215,19 @@ export const UIManager = {
 
         if (cfgResetPos) cfgResetPos.onclick = resetPos;
         if (stResetPos) stResetPos.onclick = resetPos;
+
+        // Sync Auto Lock
+        const cfgAutoLock = document.getElementById('cfg-auto-lock');
+        const stAutoLock = document.getElementById('lilith-auto-lock');
+        const syncAutoLock = (val) => {
+            const timeout = parseInt(val) || 0;
+            userState.autoLockTimeout = timeout;
+            if (cfgAutoLock) cfgAutoLock.value = timeout;
+            if (stAutoLock) stAutoLock.value = timeout;
+            saveState();
+        };
+        if (cfgAutoLock) cfgAutoLock.addEventListener('change', (e) => syncAutoLock(e.target.value));
+        if (stAutoLock) stAutoLock.addEventListener('change', (e) => syncAutoLock(e.target.value));
         
         // Buttons
         // (Removed duplicate bindings here as they are now handled in bindSharedConfigEvents called above)
@@ -1187,8 +1287,29 @@ export const UIManager = {
     updateUI() {
         const elVal = document.getElementById('favor-val');
         const elSan = document.getElementById('sanity-val');
+        const avatar = document.getElementById(avatarId);
+
         if (elVal) elVal.textContent = userState.favorability + '%';
         if (elSan) elSan.textContent = userState.sanity + '%';
+        
+        // 动态视觉反馈
+        if (avatar) {
+            // 1. 好感度影响透明度 (0.3 ~ 1.0)
+            const opacity = 0.3 + (userState.favorability / 100) * 0.7;
+            avatar.style.opacity = opacity;
+
+            // 2. 理智值影响心跳频率 (0 -> 0.6s, 100 -> 5.0s)
+            const pulseDuration = 0.6 + (userState.sanity / 100) * 4.4;
+            avatar.style.animationDuration = `${pulseDuration}s`;
+            
+            // 理智值极低时增加抖动感
+            if (userState.sanity < 20) {
+                avatar.classList.add('sanity-critical');
+            } else {
+                avatar.classList.remove('sanity-critical');
+            }
+        }
+
         this.setAvatar();
         this.updateTheme();
         this.restoreChatHistory(panelChatHistory);
@@ -1199,30 +1320,67 @@ export const UIManager = {
     },
 
     toggleWorld() {
-        userState.isInnerWorld = !userState.isInnerWorld;
-        saveState();
-        
+        if (this._isToggling) return;
+        this._isToggling = true;
+
         const worldToggle = document.getElementById('lilith-world-toggle');
         const tabs = document.querySelector('.lilith-tabs');
         const contentArea = document.querySelector('.lilith-content-area');
         const innerWorld = document.getElementById('lilith-inner-world');
-        
-        if (worldToggle) worldToggle.textContent = userState.isInnerWorld ? '🌟' : '👁️';
-        
-        if (userState.isInnerWorld) {
-            if (tabs) tabs.style.display = 'none';
-            if (contentArea) contentArea.style.display = 'none';
-            if (innerWorld) {
-                innerWorld.style.display = 'flex';
-                InnerWorldManager.render(innerWorld, this.showBubble.bind(this), this.showStatusChange.bind(this));
-            }
-            this.showBubble("契约重组中... 里世界同步完成。", "var(--l-main)");
-        } else {
-            if (tabs) tabs.style.display = 'flex';
-            if (contentArea) contentArea.style.display = 'block';
-            if (innerWorld) innerWorld.style.display = 'none';
-            this.showBubble("返回表象空间。欢迎回来，主人。", "var(--l-cyan)");
+        const panel = document.getElementById(panelId);
+
+        userState.isInnerWorld = !userState.isInnerWorld;
+        saveState();
+
+        // 1. 面板沉浸式动画
+        if (panel) {
+            panel.classList.add('world-sink-effect', 'world-transitioning');
         }
+
+        if (worldToggle) {
+            worldToggle.textContent = userState.isInnerWorld ? '🌟' : '👁️';
+            worldToggle.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
+            worldToggle.style.transform = userState.isInnerWorld ? 'scale(1.5) translateY(10px) rotate(180deg)' : 'scale(1.2) translateY(-10px)';
+            worldToggle.style.filter = 'blur(2px) contrast(200%)';
+        }
+
+        // 延长延时，让“沉入”感更明显
+        setTimeout(() => {
+            if (userState.isInnerWorld) {
+                if (tabs) tabs.style.display = 'none';
+                if (contentArea) contentArea.style.display = 'none';
+                if (innerWorld) {
+                    innerWorld.style.display = 'flex';
+                    innerWorld.classList.remove('outer-world-sink');
+                    innerWorld.classList.add('inner-world-sink');
+                    InnerWorldManager.render(innerWorld, this.showBubble.bind(this), this.showStatusChange.bind(this));
+                }
+                this.showBubble("正在下沉至底层协议... 触达莉莉丝最核心。", "var(--l-main)");
+            } else {
+                if (tabs) {
+                    tabs.style.display = 'flex';
+                    tabs.classList.add('outer-world-sink');
+                }
+                if (contentArea) {
+                    contentArea.style.display = 'block';
+                    contentArea.classList.add('outer-world-sink');
+                }
+                if (innerWorld) innerWorld.style.display = 'none';
+                this.showBubble("浮出表象空间。权限已收回。", "var(--l-cyan)");
+            }
+
+            // 清理特效类
+            setTimeout(() => {
+                if (panel) panel.classList.remove('world-sink-effect', 'world-transitioning');
+                if (worldToggle) {
+                    worldToggle.style.transform = '';
+                    worldToggle.style.filter = '';
+                }
+                if (tabs) tabs.classList.remove('outer-world-sink');
+                if (contentArea) contentArea.classList.remove('outer-world-sink');
+                this._isToggling = false;
+            }, 1000);
+        }, 500); // 增加切换前的等待感
     },
 
     updateTheme() {
@@ -1296,27 +1454,35 @@ export const UIManager = {
             displayTagName = text.replace(/\[[SF]:[+\-]?\d+\]/gi, '').trim();
         }
 
-        // [核心逻辑更新] 无论是用户还是莉莉丝，在保存到面板历史和显示之前，都经过正则优化 (提取正文/替换)
-        const optimizedText = extractContent(displayTagName, userState);
+        const optimizedText = displayTagName;
 
         const msgNode = document.createElement('div');
         msgNode.className = `msg ${role}`;
         
         if (role === 'lilith') {
+            const currentPersona = userState.activePersona || 'toxic';
+            const pack = AvatarPacks[currentPersona] || AvatarPacks['meme'];
+            const face = userState.currentFace || 'normal';
+            const avatarUrl = pack[face] || pack['normal'] || pack['happy'] || AvatarPacks['meme']['normal'];
+
             const { inner, status, action, speech } = this.parseLilithMsg(optimizedText);
+            
+            let html = `<img class="lilith-chat-avatar" src="${avatarUrl}" alt="">`;
+            html += `<div class="lilith-chat-content">`;
+
             if (inner || status || (action && action.length > 0)) {
                 msgNode.className += ' complex-msg';
-                let html = '';
                 if (status) html += `<div class="l-status-bar">🩸 ${status}</div>`;
                 if (inner) html += `<div class="l-inner-thought">💭 ${inner}</div>`;
                 if (action) html += `<div class="l-action-text">* ${action} *</div>`;
                 if (speech || (!inner && !action)) {
                     html += `<div class="l-speech-text">${speech || optimizedText}</div>`;
                 }
-                msgNode.innerHTML = html;
             } else {
-                msgNode.textContent = optimizedText;
+                html += `<div>${optimizedText}</div>`;
             }
+            html += `</div>`;
+            msgNode.innerHTML = html;
         } else {
             msgNode.textContent = optimizedText;
         }
@@ -1343,6 +1509,9 @@ export const UIManager = {
             const $hideAvatar = $('#lilith-hide-avatar');
             const $autoSend = $('#lilith-auto-send');
             const $avatarSize = $('#lilith-avatar-size');
+            const $persona = $('#lilith-persona-select');
+            const $dashStyle = $('#lilith-dashboard-style');
+            const $dashInject = $('#lilith-inject-dashboard');
 
             $freq.val(userState.commentFrequency || 0);
             $freqVal.text(`${userState.commentFrequency || 0}%`);
@@ -1350,6 +1519,32 @@ export const UIManager = {
             $hideAvatar.prop('checked', userState.hideAvatar);
             $autoSend.prop('checked', userState.autoSend !== false);
             $avatarSize.val(userState.avatarSize || 150);
+            $persona.val(userState.activePersona || 'toxic');
+            $dashStyle.val(userState.dashboardStyle || 'modern');
+            $dashInject.prop('checked', userState.injectDashboard);
+
+            // 事件绑定
+            $persona.on('change', (e) => {
+                const val = $(e.target).val();
+                switchPersonaState(val);
+                this.setAvatar();
+                this.showBubble(`已切换至人格: ${val}`, "var(--l-main)");
+                
+                // 同步悬浮窗下拉
+                const cfgPersonaSelect = document.getElementById('cfg-persona-select');
+                if (cfgPersonaSelect) cfgPersonaSelect.value = val;
+            });
+
+            $dashStyle.on('change', (e) => {
+                userState.dashboardStyle = $(e.target).val();
+                saveState();
+                this.showBubble(`看版风格已更新: ${userState.dashboardStyle}`);
+            });
+
+            $dashInject.on('change', (e) => {
+                userState.injectDashboard = $(e.target).prop('checked');
+                saveState();
+            });
 
             // [新增] 动态内容绑定
             const $dynEnabled = $('#lilith-dynamic-enabled');
@@ -1362,6 +1557,17 @@ export const UIManager = {
             $dynInterval.val(userState.dynamicContentInterval || 20);
             $dynCount.val(userState.dynamicContentCount || 6);
             $dynTriggerChance.val(userState.dynamicContentTriggerChance || 100);
+
+            // [新增] 自动锁定绑定
+            const $autoLock = $('#lilith-auto-lock');
+            $autoLock.val(userState.autoLockTimeout || 0);
+            $autoLock.on('change', (e) => {
+                const val = parseInt($(e.target).val()) || 0;
+                userState.autoLockTimeout = val;
+                saveState();
+                const cfgInput = document.getElementById('cfg-auto-lock');
+                if (cfgInput) cfgInput.value = val;
+            });
 
             $dynEnabled.on('change', (e) => {
                 userState.dynamicContentEnabled = $(e.target).prop('checked');
@@ -1406,16 +1612,15 @@ export const UIManager = {
             $verInfo.text(`${UpdateManager.localVersion}`);
 
             const refreshUpdateUI = () => {
-                const $btnText = $manualBtn.find('span');
                 if (UpdateManager.hasUpdate) {
-                    $btnText.text(`发现新版 v${UpdateManager.remoteVersion}`);
+                    $manualBtn.text(`发现新版 v${UpdateManager.remoteVersion}`);
                     $manualBtn.css({
                         'background': 'var(--l-main, #ff0055)',
                         'color': '#fff',
                         'border': '1px solid #ff0055'
                     });
                 } else {
-                    $btnText.text('更新插件');
+                    $manualBtn.text('检查更新');
                     $manualBtn.css({
                         'background': '',
                         'color': '',
@@ -1428,19 +1633,13 @@ export const UIManager = {
             refreshUpdateUI();
 
             $manualBtn.on('click', async () => {
-                const $span = $manualBtn.find('span');
-                const $icon = $manualBtn.find('i');
-                
-                $span.text('同步中...');
-                $icon.addClass('fa-spin');
+                $manualBtn.text('同步中...');
                 $manualBtn.prop('disabled', true);
                 
                 await UpdateManager.checkUpdate();
                 
-                $icon.removeClass('fa-spin');
-                
                 if (UpdateManager.hasUpdate) {
-                    $span.text('更新中...');
+                    $manualBtn.text('更新中...');
                     await UpdateManager.updateAndReload();
                 } else {
                     toastr.success('已是最新版本');
@@ -1533,27 +1732,27 @@ export const UIManager = {
 
             $extractEnable.on('change', (e) => {
                 userState.extractionEnabled = $(e.target).prop('checked');
-                saveExtensionSettings();
+                saveState();
             });
 
             $extractRegex.on('change', (e) => {
                 userState.extractionRegex = $(e.target).val();
-                saveExtensionSettings();
+                saveState();
             });
 
             $replEnable.on('change', (e) => {
                 userState.textReplacementEnabled = $(e.target).prop('checked');
-                saveExtensionSettings();
+                saveState();
             });
             
             $replRegex.on('change', (e) => {
                 userState.textReplacementRegex = $(e.target).val();
-                saveExtensionSettings();
+                saveState();
             });
             
             $replString.on('change', (e) => {
                 userState.textReplacementString = $(e.target).val();
-                saveExtensionSettings();
+                saveState();
             });
 
             $('#lilith-extraction-test-btn').on('click', () => {
@@ -1575,12 +1774,12 @@ export const UIManager = {
                         const match = pattern.exec(result);
                         if (match) {
                             result = match[1] !== undefined ? match[1] : match[0];
-                            log.push("Extraction: OK");
+                            log.push("正文提取：成功 (OK)");
                         } else {
-                            log.push("Extraction: No Match");
+                            log.push("正文提取：未匹配 (No Match)");
                         }
                     } catch (err) {
-                        log.push("Extraction Error: " + err.message);
+                        log.push("正文提取错误 (Error): " + err.message);
                     }
                 }
 
@@ -1591,17 +1790,17 @@ export const UIManager = {
                         const before = result;
                         result = result.replace(pattern, replStr || "");
                         if (result !== before) {
-                             log.push("Replace: OK");
+                             log.push("文字替换：成功 (OK)");
                         } else {
-                             log.push("Replace: No Match");
+                             log.push("文字替换：未匹配 (No Match)");
                         }
                     } catch (err) {
-                        log.push("Replace Error: " + err.message);
+                        log.push("文字替换错误 (Error): " + err.message);
                     }
                 }
 
                 const $display = $('#lilith-extraction-test-result');
-                $display.text(`[Logs: ${log.join(' | ')}]\n---\n${result}`);
+                $display.text(`[运行日志: ${log.join(' | ')}]\n---\n${result}`);
                 
                 // Visual feedback
                 $display.css('color', '#aaffaa');
@@ -1620,7 +1819,7 @@ export const UIManager = {
                 if(cfgFreq) cfgFreq.value = val;
                 if(cfgFreqVal) cfgFreqVal.textContent = val;
 
-                saveExtensionSettings();
+                saveState();
             });
 
             $mode.on('change', (e) => {
@@ -1630,7 +1829,7 @@ export const UIManager = {
                 const cfgMode = document.getElementById('cfg-comment-mode');
                 if(cfgMode) cfgMode.value = userState.commentMode;
 
-                saveExtensionSettings();
+                saveState();
             });
 
             $hideAvatar.on('change', (e) => {
@@ -1642,7 +1841,7 @@ export const UIManager = {
                 const cfgHide = document.getElementById('cfg-hide-avatar');
                 if(cfgHide) cfgHide.checked = userState.hideAvatar;
 
-                saveExtensionSettings();
+                saveState();
             });
 
             $autoSend.on('change', (e) => {
@@ -1652,7 +1851,7 @@ export const UIManager = {
                 const cfgAuto = document.getElementById('cfg-auto-send');
                 if(cfgAuto) cfgAuto.checked = userState.autoSend;
 
-                saveExtensionSettings();
+                saveState();
             });
 
             $avatarSize.on('input', (e) => { 
@@ -1665,7 +1864,7 @@ export const UIManager = {
                 if(cfgSize) cfgSize.value = userState.avatarSize;
                 if(cfgSizeVal) cfgSizeVal.textContent = userState.avatarSize;
 
-                saveExtensionSettings();
+                saveState();
             });
 
             $('#lilith-toggle-panel').on('click', () => {
@@ -1730,6 +1929,73 @@ export const UIManager = {
             }
         });
         div.scrollTop = div.scrollHeight;
+    },
+
+    /**
+     * 将全域链路概览（汇总看板）注入到聊天正文最后一条 AI 消息下方
+     */
+    injectEmbeddedDashboard() {
+        if (!userState.injectDashboard) {
+            $('.lilith-embedded-dashboard-container').remove();
+            return;
+        }
+
+        const findLastAiMes = () => {
+            const allMes = document.querySelectorAll('#chat .mes');
+            if (!allMes.length) return null;
+            
+            for (let i = allMes.length - 1; i >= 0; i--) {
+                const el = allMes[i];
+                if (el.getAttribute('is_user') === 'true' || el.getAttribute('is_system') === 'true' || el.classList.contains('sys_mes')) continue;
+                if (getComputedStyle(el).display === 'none') continue;
+                return el;
+            }
+            return null;
+        };
+
+        const targetMes = findLastAiMes();
+        if (!targetMes) return;
+
+        const mesBlock = targetMes.querySelector('.mes_block') || targetMes;
+        
+        // 检查是否已经存在
+        let existing = document.querySelector('.lilith-embedded-dashboard-container');
+        
+        // 如果位置不对，移除旧的（确保它始终在最后一条消息）
+        if (existing && existing.parentElement !== mesBlock) {
+            existing.remove();
+            existing = null;
+        }
+
+        if (!existing) {
+            existing = document.createElement('div');
+            existing.className = 'lilith-embedded-dashboard-container';
+            existing.style = 'margin-top: 15px; border-top: 1px dashed rgba(255,0,85,0.2); padding-top: 10px; width: 100%; clear: both; box-sizing: border-box;';
+            mesBlock.appendChild(existing);
+        }
+
+        // 渲染看板内容 (全域链路概览)
+        InnerWorldManager.renderDashboardOnly(existing, this.showBubble.bind(this), this.showStatusChange.bind(this));
+    },
+
+    /**
+     * 同步全域链路概览注入开关
+     */
+    syncDashboardInjection(checked) {
+        userState.injectDashboard = checked;
+        
+        // 同步 Inner World 的开关 (如果存在)
+        const innerInjectDash = document.getElementById('cfg-inner-inject-dash');
+        if (innerInjectDash) innerInjectDash.checked = checked;
+
+        // 如果关闭，移除所有已存在的看板
+        if (!checked) {
+            $('.lilith-embedded-dashboard-container').remove();
+        } else {
+            // 如果开启，尝试立即注入一次
+            this.injectEmbeddedDashboard();
+        }
+        saveState();
     },
 
     renderMemoryUI() {
@@ -1886,6 +2152,135 @@ export const UIManager = {
             } else {
                 mesText.append(html);
             }
+        }
+    },
+
+    // --- 自动锁定系统 ---
+    isLocked: false,
+    lastActivity: Date.now(),
+    lockTimer: null,
+
+    initAutoLock(parentWin = window) {
+        if (this.lockTimer) clearInterval(this.lockTimer);
+        
+        const resetActivity = () => {
+            if (this.isLocked) {
+                // 如果启用了密码，则操作事件不触发自动解锁
+                if (userState.lockPasswordEnabled && userState.lockPassword) return;
+                this.unlockUI();
+            }
+            this.lastActivity = Date.now();
+        };
+
+        const targets = [window];
+        if (parentWin && parentWin !== window) targets.push(parentWin);
+
+        targets.forEach(t => {
+            ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+                try {
+                    t.addEventListener(evt, resetActivity, { passive: true });
+                } catch (e) {}
+            });
+        });
+
+        this.lockTimer = setInterval(() => {
+            if (userState.autoLockTimeout > 0 && !this.isLocked) {
+                const diff = (Date.now() - this.lastActivity) / 60000;
+                if (diff >= userState.autoLockTimeout) {
+                    this.lockUI();
+                }
+            }
+        }, 10000); 
+    },
+
+    lockUI() {
+        if (this.isLocked) return;
+        this.isLocked = true;
+        console.log('[Lilith] 自动锁定激活');
+        
+        // [锁定策略] 停止语音输出
+        AudioSys.stop();
+
+        const lockOverlay = document.createElement('div');
+        lockOverlay.id = 'lilith-lock-overlay';
+        lockOverlay.style = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px);
+            z-index: 2147483647; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; color: var(--l-main);
+            font-family: var(--l-font); pointer-events: all;
+            animation: matrix-fade-in 0.5s ease;
+        `;
+        
+        lockOverlay.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 20px; filter: drop-shadow(0 0 10px var(--l-main)); animation: pulse 2s infinite;">🔒</div>
+            <div style="font-size: 20px; font-weight: bold; letter-spacing: 2px; text-shadow: 0 0 10px var(--l-main);">核心功能锁定 (CORE_LOCKED)</div>
+            <div style="font-size: 11px; margin-top: 10px; opacity: 0.7; font-family: 'Share Tech Mono'; color:#fff;">检测到操作不活跃，莉莉丝已锁定核心功能 (INACTIVITY_DETECTED)</div>
+            
+            ${(userState.lockPasswordEnabled && userState.lockPassword) ? `
+                <div id="lock-pwd-container" style="margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px; animation: slide-up 0.4s ease;">
+                    <input type="password" id="lock-pwd-input" placeholder="输入密钥解锁..." style="background: rgba(0,0,0,0.5); border: 1px solid var(--l-main); color: #fff; padding: 8px 15px; border-radius: 4px; text-align: center; font-family: monospace; outline: none; width: 200px;">
+                    <div id="lock-pwd-msg" style="font-size: 10px; color: #ff0055; min-height: 12px; opacity: 0;">Access Denied</div>
+                    <button id="lock-pwd-submit" style="background: var(--l-main); color: #000; border: none; padding: 5px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: all 0.2s;">验证协议 (UNLOCK)</button>
+                </div>
+            ` : `
+                <div style="margin-top: 20px; font-size: 9px; opacity: 0.4; border: 1px solid rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px;">移动鼠标或点击屏幕解锁</div>
+            `}
+        `;
+        
+        document.body.appendChild(lockOverlay);
+
+        if (userState.lockPasswordEnabled && userState.lockPassword) {
+            const input = document.getElementById('lock-pwd-input');
+            const btn = document.getElementById('lock-pwd-submit');
+            const msg = document.getElementById('lock-pwd-msg');
+
+            const attemptUnlock = () => {
+                if (input.value === userState.lockPassword) {
+                    this.unlockUI();
+                } else {
+                    input.style.borderColor = '#ff0055';
+                    input.style.animation = 'glitch-error 0.3s ease';
+                    msg.style.opacity = '1';
+                    setTimeout(() => {
+                        input.style.animation = '';
+                        input.value = '';
+                    }, 300);
+                    AudioSys.speak("密码错误，别乱动老娘的东西。");
+                }
+            };
+
+            btn?.addEventListener('click', attemptUnlock);
+            input?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') attemptUnlock();
+            });
+            input?.focus();
+        }
+        
+        const wrapper = document.getElementById(containerId);
+        if (wrapper) wrapper.style.filter = 'blur(5px) grayscale(1)';
+    },
+
+    unlockUI() {
+        if (!this.isLocked) return;
+        this.isLocked = false;
+        console.log('[Lilith] 自动锁定解除');
+
+        const overlay = document.getElementById('lilith-lock-overlay');
+        if (overlay) {
+            overlay.style.opacity = '0';
+            overlay.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => overlay.remove(), 300);
+        }
+
+        const wrapper = document.getElementById(containerId);
+        if (wrapper) wrapper.style.filter = '';
+
+        // [锁定策略] 解锁后刷新 UI 与看板，恢复实时性
+        this.injectEmbeddedDashboard();
+        const innerContainer = document.querySelector('.inner-world-container');
+        if (innerContainer) {
+            InnerWorldManager.render(innerContainer, this.showBubble.bind(this), this.showStatusChange.bind(this));
         }
     }
 };
