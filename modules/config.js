@@ -178,7 +178,7 @@ export const DEFAULT_STATE = {
     activePersona: 'toxic',
     isInnerWorld: false,
     hideAvatar: false,
-    avatarSize: 150,
+    avatarSize: 100,
     posLeft: 200,
     posTop: 20,
     panelWidth: 360,

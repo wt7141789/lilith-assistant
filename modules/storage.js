@@ -42,7 +42,7 @@ export function validateState() {
             activePersona: DEFAULT_STATE.activePersona || 'toxic',
             isInnerWorld: DEFAULT_STATE.isInnerWorld || false,
             hideAvatar: DEFAULT_STATE.hideAvatar || false,
-            avatarSize: DEFAULT_STATE.avatarSize || 150,
+            avatarSize: DEFAULT_STATE.avatarSize || 100,
             commentFrequency: DEFAULT_STATE.commentFrequency || 50,
             autoSend: DEFAULT_STATE.autoSend !== undefined ? DEFAULT_STATE.autoSend : true,
             injectSTContext: DEFAULT_STATE.injectSTContext !== undefined ? DEFAULT_STATE.injectSTContext : true,

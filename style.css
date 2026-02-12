@@ -232,7 +232,7 @@ div.lilith-chat-ui:hover {
 
 /* 悬浮助手样式更新 */
 :root {
-    --l-avatar-size: 90px;
+    --l-avatar-size: 100px;
     --l-panel-offset: calc(var(--l-avatar-size) / 2);
     --l-panel-max-height: 90vh;
 }
