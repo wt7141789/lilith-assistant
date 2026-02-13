@@ -2136,25 +2136,44 @@ export const UIManager = {
                 return;
             }
 
-            // 稳定性优化：将面板挂载在聊天容器 (#chat) 的末尾，而不是具体的某条消息内部。
-            // 这样可以彻底避免酒馆在渲染消息时（尤其是流式输出）销毁并重建面板导致的闪烁。
+            // 参考数据库脚本，寻找最后一条 AI 消息作为锚点
+            const getTargetContainer = () => {
+                const $allMes = $('#chat .mes');
+                const lastAiMes = $allMes.filter(function() {
+                    const $this = $(this);
+                    const isUser = $this.attr('is_user') === 'true';
+                    const isSystem = $this.attr('is_system') === 'true' || $this.hasClass('system_error');
+                    return !isUser && !isSystem;
+                }).last();
+                
+                if (lastAiMes.length === 0) return null;
+                return lastAiMes.find('.mes_block')[0];
+            };
+
+            const target = getTargetContainer();
             const chatBody = document.getElementById('chat');
-            if (!chatBody) return;
+            
+            // 如果找不到锚点消息（比如刚开局），则退而求其次挂载在聊天框末尾
+            const fallbackContainer = chatBody;
+            const finalParent = target || fallbackContainer;
+            if (!finalParent) return;
 
             // 检查是否已经存在
             let existing = document.querySelector('.lilith-embedded-dashboard-container');
             
-            // 如果不存在，则创建并追加到 #chat 末尾
+            // 如果面板已经在正确的位置，不重新移动以减少闪烁
+            if (existing && existing.parentElement !== finalParent) {
+                existing.remove();
+                existing = null;
+            }
+
+            // 如果不存在，则创建并追加
             if (!existing) {
                 existing = document.createElement('div');
                 existing.className = 'lilith-embedded-dashboard-container';
-                // 恢复原始尺寸：使用 100% 宽度，并根据酒馆通常布局适配 max-width
-                // position: relative 配合 margin 确保在回复流下方稳定占位
-                existing.style = 'margin: 30px auto; max-width: 1000px; border-top: 1px dashed rgba(255,0,85,0.2); padding-top: 15px; padding-bottom: 60px; width: 100%; clear: both; box-sizing: border-box; position: relative; z-index: 10; background: transparent; transition: all 0.3s ease;';
-                chatBody.appendChild(existing);
-            } else if (existing.nextSibling) {
-                // 稳定性优化：确保它始终在 #chat 的最底部（没有任何兄弟节点在它后面）
-                chatBody.appendChild(existing);
+                // 适配消息流布局：100% 宽度，带有小间距
+                existing.style = 'margin-top: 10px; margin-bottom: 5px; width: 100%; clear: both; box-sizing: border-box; position: relative; z-index: 10; background: transparent; transition: all 0.3s ease;';
+                finalParent.appendChild(existing);
             }
 
             // 渲染看板内容 (全域链路概览)
