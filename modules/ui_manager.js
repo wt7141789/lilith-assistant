@@ -1506,27 +1506,40 @@ export const UIManager = {
     },
 
     parseLilithMsg(text) {
+        if (!text) return { inner: "", status: "", action: "", speech: "" };
         let inner = "", status = "", action = "", speech = text;
 
+        // 1. 解析内心世界 (改进正则，防止跨行全选)
         const innerMatch = speech.match(/\(💭.*?\)|（💭.*?）|\(Inner.*?\)|（潜意识.*?）/is);
         if (innerMatch) {
             inner = innerMatch[0].replace(/[\(（]💭?|Inner:?|潜意识:?|[\)）]/gi, '').trim();
             speech = speech.replace(innerMatch[0], '');
         }
 
+        // 2. 解析血量/好感状态
         const statusMatch = speech.match(/\[🩸.*?\].*?\]|\[Status:.*?\]|\[状态:.*?\]/i);
         if (statusMatch) {
             status = statusMatch[0].replace(/[\[\]]|🩸|Status:|状态:/gi, '').trim();
             speech = speech.replace(statusMatch[0], '');
         }
 
-        const actionMatches = speech.match(/\*.*?\*/g);
+        // 3. 解析动作 (支持跨行)
+        const actionMatches = speech.match(/\*.*?\*/gs);
         if (actionMatches) {
-            action = actionMatches.map(a => a.replace(/\*/g, '')).join(' ');
-            speech = speech.replace(/\*.*?\*/g, '');
+            action = actionMatches.map(a => a.replace(/\*/g, '').trim()).filter(a => a).join(' ');
+            speech = speech.replace(/\*.*?\*/gs, '');
         }
 
+        // 4. 去除多余空格和换行
         speech = speech.trim();
+
+        // [核心修复] 保底：如果正文被扣没了，但原始文本有东西，就把原始文本还回去
+        if (!speech && !inner && !action && text.trim()) {
+            speech = text.trim();
+        }
+
+        return { inner, status, action, speech };
+    },
 
         return { inner, status, action, speech };
     },
