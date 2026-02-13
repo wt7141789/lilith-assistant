@@ -110,7 +110,7 @@ export const InnerWorldManager = {
         return `
             <div class="inner-dashboard-card dash-slot-item" style="background:rgba(128,128,128,0.08); border:1px solid ${hasWarning ? '#ff0055' : 'rgba(128,128,128,0.15)'}; border-radius:6px; padding:12px; margin-bottom:12px; border-left:3px solid ${color}; position:relative;">
                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                    <div class="dash-slot-title" style="display:flex; align-items:center; gap:8px; color:${color}; font-size:12px; font-weight:bold; text-transform:uppercase;">
+                    <div class="dash-slot-title" style="display:flex; align-items:center; gap:8px; color:${color}; font-size:14px; font-weight:bold; text-transform:uppercase;">
                         <i class="${icon}"></i> ${title}
                     </div>
                     ${hasWarning ? `
@@ -119,7 +119,7 @@ export const InnerWorldManager = {
                         </div>
                     ` : ''}
                 </div>
-                <div class="card-content" style="font-size:11px; color:inherit;">
+                <div class="card-content" style="font-size:12px; color:inherit;">
                     ${contentHtml}
                 </div>
             </div>
@@ -164,11 +164,11 @@ export const InnerWorldManager = {
                         ${avatarUrl ? `<div class="dash-avatar-circle" style="background-image: url('${avatarUrl}'); color:var(--l-main);"></div>` : `<div class="dash-avatar-circle" style="display:flex; align-items:center; justify-content:center; color:var(--l-main);"><i class="fa-solid fa-ghost"></i></div>`}
                         <div>
                             <div class="dash-header-text" style="font-size:13px; font-weight:bold; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
-                                <i class="fa-solid fa-satellite-dish" style="animation: ${isCollapsed ? 'none' : 'pulse 2s infinite'}; font-size:10px;"></i> 
-                                全域链路概览 (OMNI-LINK)
+                                <i class="fa-solid fa-atom" style="animation: ${isCollapsed ? 'none' : 'pulse 2s infinite'}; font-size:10px;"></i> 
+                                虚空核心 (VOID_CORE)
                                 <i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}" style="font-size:10px; opacity:0.5; margin-left:4px;"></i>
                             </div>
-                            <div style="font-size:9px; opacity:0.6; font-family:monospace; display: ${isCollapsed ? 'block' : 'none'};">MATRIX_STATUS: SYNCHRONIZED</div>
+                            <div style="font-size:9px; opacity:0.6; font-family:monospace; display: ${isCollapsed ? 'block' : 'none'};">CORE_STATUS: RUNNING</div>
                             <div style="font-size:9px; opacity:0.6; font-family:monospace; display: ${isCollapsed ? 'none' : 'block'};">LILITH_CORE: STYLE_${styleMode.toUpperCase()}</div>
                         </div>
                     </div>
@@ -238,7 +238,7 @@ export const InnerWorldManager = {
                 <!-- 导航标签 -->
                 <div class="inner-table-tabs" style="flex-shrink:0; display:flex; flex-wrap:wrap; gap:5px; margin-bottom:12px; padding-bottom:5px;">
                     <div class="inner-tab ${this.activeTableId === 'dashboard' ? 'active' : ''}" data-id="dashboard" style="padding:4px 10px; font-size:11px; cursor:pointer; border:1px solid ${this.activeTableId === 'dashboard' ? 'var(--l-main)' : '#333'}; border-radius:4px; white-space:nowrap; background:rgba(0,0,0,0.2);">
-                        全域链路概览
+                        虚空核心
                     </div>
                     ${externalData ? Object.keys(externalData)
                         .filter(id => id && id !== 'mate' && id !== 'meta' && id !== 'null' && id !== 'undefined' && externalData[id] && typeof externalData[id] === 'object' && externalData[id].content)
@@ -353,19 +353,20 @@ export const InnerWorldManager = {
     renderSlot(title, icon, info, rule = 'kv', color = 'var(--l-cyan)', slotId = '', hasWarning = false, warningDetail = '') {
         if (!info || info.length === 0) return '';
         
+        const isWorldParam = slotId === 'world';
         let contentHtml = '';
         if (rule === 'kv') {
             const html = info.map(it => `
-                <div class="inner-data-item dashboard-pop-trigger" 
+                <div class="${isWorldParam ? '' : 'dashboard-pop-trigger'} inner-data-item" 
                      data-slot="${slotId}"
                      data-table-id="${it.tableId}"
                      data-row-index="${it.rowIndex}"
                      data-col-index="${it.colIndex}"
                      data-title="${it.key}" 
                      data-val="${it.value}" 
-                     style="padding-bottom:2px; overflow:hidden; cursor:pointer;">
-                    <span style="color:inherit; opacity:0.6; font-size:9px; white-space:nowrap;">${it.key}</span><br>
-                    <span style="color:${color}; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; font-weight:bold;">${it.value}</span>
+                     style="padding-bottom:2px; overflow:hidden; ${isWorldParam ? 'cursor:default;' : 'cursor:pointer;'}">
+                    <span style="color:inherit; opacity:0.6; font-size:10px; white-space:nowrap;">${it.key}</span><br>
+                    <span style="color:${color}; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; font-weight:bold;">${it.value}</span>
                 </div>`).join('');
             contentHtml = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">${html}</div>`;
         } else if (rule === 'capsule') {
@@ -377,7 +378,7 @@ export const InnerWorldManager = {
                      data-col-index="${it.colIndex}"
                      data-title="${it.key}" 
                      data-val="${it.value}" 
-                     style="background:rgba(128,128,128,0.1); border:1px solid rgba(128,128,128,0.15); border-radius:12px; padding:2px 8px; font-size:10px; color:inherit; white-space:nowrap; border-left:2px solid ${color}; cursor:pointer; font-weight:bold;">
+                     style="background:rgba(128,128,128,0.1); border:1px solid rgba(128,128,128,0.15); border-radius:12px; padding:2px 8px; font-size:12px; color:inherit; white-space:nowrap; border-left:2px solid ${color}; cursor:pointer; font-weight:bold;">
                     ${it.key}
                 </div>`).join('');
             contentHtml = `<div style="display:flex; flex-wrap:wrap; gap:4px; max-height:100px; overflow-y:auto; padding-right:2px;">${html}</div>`;
