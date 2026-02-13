@@ -3,6 +3,8 @@ import { UIManager } from './ui_manager.js';
 import { assistantManager } from './assistant_manager.js';
 import { userState } from './storage.js';
 import { AudioSys } from './audio.js';
+import { extractContent } from './utils.js';
+import { InnerWorldManager } from './inner_world_manager.js';
 
 /**
  * Handles all SillyTavern system events and DOM mutation observers.
@@ -83,11 +85,23 @@ export const EventManager = {
 
                 // Conditions for interjection
                 if (!lastMsg.is_user && !lastMsg.is_system && lastMsg.mes && !lastMsg.mes.includes('[莉莉丝]')) {
-                    const freq = userState.commentFrequency || 50;
+                    const freq = (typeof userState.commentFrequency === 'number') ? userState.commentFrequency : 30;
+                    
+                    console.log(`[Lilith] Interjection check: freq=${freq}, roll...`);
+                    
                     if (Math.random() * 100 < freq) {
                         console.log('[Lilith] Random interjection triggered.');
                         setTimeout(() => assistantManager.triggerRealtimeComment(messageId), 1500);
+                    } else {
+                        console.log('[Lilith] Random interjection rolled skip.');
                     }
+                } else {
+                    console.log('[Lilith] Interjection conditions not met:', {
+                        is_user: lastMsg.is_user,
+                        is_system: lastMsg.is_system,
+                        has_mes: !!lastMsg.mes,
+                        already_has_tag: lastMsg.mes?.includes('[莉莉丝]')
+                    });
                 }
             });
 

@@ -7,6 +7,13 @@ import { getPageContext, createSmartRegExp, extractContent } from './utils.js';
 import { UIManager } from './ui_manager.js';
 import { InnerWorldManager } from './inner_world_manager.js';
 
+const thinkingPrompts = [
+    "让我看看你又说了什么蠢话... 💭",
+    "思考中... 这种回复也亏你想得出来。 💢",
+    "正在构思如何优雅地吐槽你... 🔍",
+    "正在锐评中... ⚖️"
+];
+
 export const assistantManager = {
     config: {
         apiType: 'native',
@@ -473,38 +480,32 @@ export const assistantManager = {
     },
 
     async triggerRealtimeComment(messageId) {
-        console.log('[Lilith] triggerRealtimeComment called for messageId', messageId);
+        console.log('[Lilith] triggerRealtimeComment called for messageId:', messageId);
         const context = SillyTavern.getContext();
         const chatData = context.chat || [];
 
         let targetIndex = chatData.findIndex(m =>
-            (typeof m.message_id === 'number' && m.message_id === messageId) ||
-            (typeof m.mesid === 'number' && m.mesid === messageId)
+            (m.message_id == messageId) ||
+            (m.mesid == messageId)
         );
 
         if (targetIndex === -1) {
+            console.log('[Lilith] targetIndex -1, falling back to last message');
             targetIndex = chatData.length - 1;
         }
 
         const targetMsg = chatData[targetIndex];
         if (!targetMsg || targetMsg.is_user || targetMsg.is_system) {
-            console.error('[Lilith] targetMsg invalid for comment (not an AI reply). messageId:', messageId, 'index:', targetIndex);
+            console.error('[Lilith] targetMsg invalid for comment:', {
+                index: targetIndex,
+                is_user: targetMsg?.is_user,
+                is_system: targetMsg?.is_system
+            });
             return;
         }
 
-        // UI Feedback (Imported from ui_manager later if needed)
-        // For now, assume global availability or we refactor ui interaction
-        const thinkingPrompts = [
-            "让我看看你又说了什么蠢话... 💭",
-            "思考中... 这种回复也亏你想得出来。 💢",
-            "正在构思如何优雅地吐槽你... 🔍",
-            "正在锐评中... ⚖️"
-        ];
-        const randomThinking = thinkingPrompts[Math.floor(Math.random() * thinkingPrompts.length)];
-        
-        // Internal event or callback might be better, but let's stick to direct call if possible
-        const bubble = document.getElementById('lilith-bubble-cn');
-        if (bubble) bubble.textContent = randomThinking;
+        // UI Feedback
+        UIManager.showBubble(thinkingPrompts[Math.floor(Math.random() * thinkingPrompts.length)], "var(--l-cyan)");
 
         const isInjecting = userState.injectSTContext !== false;
         const chatLog = isInjecting ? getPageContext(5, userState).map(m => `${m.name}: ${m.message}`).join('\n') : "(Context injection disabled by user)";
