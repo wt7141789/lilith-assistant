@@ -37,6 +37,7 @@ export const assistantManager = {
         userState.apiPresets = presets;
         this.config = { ...currentConfig };
         userState.apiConfig = { ...currentConfig };
+        this.resetErrorState(); // 保存配置时重置错误状态
         saveState();
     },
 
@@ -46,6 +47,7 @@ export const assistantManager = {
         if (preset) {
             this.config = JSON.parse(JSON.stringify(preset.config || preset.apiConfig || {}));
             userState.apiConfig = JSON.parse(JSON.stringify(this.config));
+            this.resetErrorState(); // 加载预设时重置错误状态
             saveState();
             return true;
         }
@@ -363,33 +365,50 @@ export const assistantManager = {
                 UIManager.renderMemoryUI();
                 UIManager.showBubble("记忆已归档。", "#0f0");
             } else {
-                 UIManager.showBubble("记忆总结失败 (API返回空)", "#f00");
+                 console.warn("[Lilith] 总结跳过或失败 (API熔断或返回空)");
             }
         } catch (e) {
             console.error("Summary failed", e);
-            UIManager.showBubble("记忆总结出错: " + e.message, "#f00");
         }
     },
 
     errorCount: 0, // [新增] API 错误计数器
+    errorNotified: false, // [新增] 是否已经通过弹出框提醒过用户
+
+    resetErrorState() {
+        this.errorCount = 0;
+        this.errorNotified = false;
+        console.log('[Lilith] API 错误计数已重置。');
+    },
 
     async callUniversalAPI(parentWin, text, options = {}) {
-        UIManager.setLoadingState(true);
+        const { isChat = false, mode = "normal", systemPrompt = null } = options; 
 
-        // 如果错误次数超过 3 次，且没有被手动重置，则停止触发请求
+        // 如果错误次数超过 3 次，则停止触发请求
         if (this.errorCount >= 3) {
-            console.warn('[Lilith] API 已连续出错 3 次，自动停止请求。请检查 API 配置或网络后再试。');
-            UIManager.showBubble("API 好像坏掉了... 已经连续报错 3 次了，我先闭嘴了哦。请检查配置或者网络。", "#ff0055");
-            UIManager.setLoadingState(false);
+            console.warn('[Lilith] API 已处于熔断状态，跳过请求。');
+            
+            // 只有当用户主动聊天 (isChat: true) 时，才通过气泡提醒
+            if (isChat && !this.errorNotified) {
+                UIManager.showBubble("API 连续报错达到上限，已自动熔断。请检查 Key 或网络，重新保存配置即可恢复。", "#ff0055");
+                this.errorNotified = true;
+            }
             return null;
         }
 
+        UIManager.setLoadingState(true);
+
         try {
-            const { isChat = false, mode = "normal", systemPrompt = null } = options; 
             const isInternal = mode === 'memory_internal';
 
             const { apiType, apiKey, baseUrl, model } = this.config; 
-            if (!apiKey) return null;
+            
+            // 基础检查：如果没有 Key，直接报错并不计入熔断
+            if (!apiKey) {
+                if (isChat) UIManager.showBubble("API Key 还没填呢，杂鱼~", "#ff0055");
+                UIManager.setLoadingState(false);
+                return null;
+            }
             
             let url = baseUrl.replace(/\/$/, ''); 
             
@@ -431,7 +450,10 @@ export const assistantManager = {
                 fetchBody = JSON.stringify({ model: model, messages: msgs, max_tokens: 4096, temperature: 1.0 });
             } else {
                 let modelId = model; 
-                if (!modelId.startsWith('models/') && !url.includes(modelId)) modelId = 'models/' + modelId;
+                if (!modelId.startsWith('models/')) {
+                    if (url.includes('googleapis.com')) modelId = 'models/' + modelId;
+                }
+                
                 fetchUrl = `${url}/v1beta/${modelId}:generateContent?key=${apiKey}`;
                 let promptText = isChat ? msgs.map(m => `[${m.role === 'lilith' ? 'Model' : (m.role==='system'?'System':'User')}]: ${m.content}`).join('\\n') : msgs[0].content;
                 fetchHeaders = { 'Content-Type': 'application/json' }; 
@@ -446,18 +468,19 @@ export const assistantManager = {
                     ]
                 });
             }
+
             const response = await fetch(fetchUrl, { method: 'POST', headers: fetchHeaders, body: fetchBody });
             
             if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(`HTTP Error ${response.status}: ${JSON.stringify(errData)}`);
+                const errText = await response.text().catch(() => "Unknown error");
+                throw new Error(`HTTP ${response.status}: ${errText.substring(0, 100)}`);
             }
 
             const data = await response.json();
             let reply = apiType === 'openai' ? data.choices?.[0]?.message?.content : data.candidates?.[0]?.content?.parts?.[0]?.text;
             
-            // 成功请求，重置错误统计
-            this.errorCount = 0;
+            // 成功请求，彻底清空错误状态
+            this.resetErrorState();
 
             reply = reply?.trim();
             if (isChat && reply && !isInternal) { 
@@ -465,8 +488,13 @@ export const assistantManager = {
             }
             return reply;
         } catch(e) { 
-            this.errorCount++; // 累加错误计数
-            console.error(`API Error (Count: ${this.errorCount}):`, e); 
+            this.errorCount++;
+            console.error(`[Lilith] API Error (Attempt ${this.errorCount}/3):`, e);
+            
+            if (this.errorCount >= 3 && !this.errorNotified) {
+                UIManager.showBubble("API 连续报错 3 次，已自动停止。请检查网络或配置，重新保存配置即可重置状态。", "#ff0055");
+                this.errorNotified = true;
+            }
             return null; 
         } finally {
             UIManager.setLoadingState(false);
@@ -826,6 +854,10 @@ ${chatLog}
 
     async generateDynamicContent(parentWin) {
         if (UIManager.isLocked) return; // [锁定策略] 锁定期间停止AI逻辑
+        
+        // 如果 API 已经熔断，不要显示“正在构思”的气泡，否则会不断重复弹出
+        if (this.errorCount >= 3) return;
+
         console.log('[Lilith] Generating dynamic content...');
         // 关键修复：确保每次生成都从 userState 中获取最新的好感、理智和条目数
         const f = Number(userState.favorability) || 20;

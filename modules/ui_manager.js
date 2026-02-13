@@ -1054,6 +1054,9 @@ export const UIManager = {
                  // Ensure the live assistant config is also updated
                  if (assistant) {
                     assistant.config = { ...assistant.config, ...newConfig };
+                    if (typeof assistant.resetErrorState === 'function') {
+                        assistant.resetErrorState(); // 保存配置时重置 API 错误熔断状态
+                    }
                  }
                  saveState();
                  this.showBubble("配置已覆盖由神经中枢...", "#0f0");
