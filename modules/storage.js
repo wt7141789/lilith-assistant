@@ -104,6 +104,9 @@ export function validateState() {
     for (let key in userState) delete userState[key];
     Object.assign(userState, settings.personaData[currentP]);
     
+    // [修复] 移除 userState 中的 chatHistory 副本，避免 saveState 时覆盖 panelChatHistory
+    if (userState.chatHistory) delete userState.chatHistory;
+
     // Overlay Global Settings (Global takes precedence for UI settings)
     Object.assign(userState, settings.global);
     console.log('[Lilith] Current UserState:', userState);
@@ -116,8 +119,8 @@ export function validateState() {
     }
 
     // Ensure basic numeric fields exist
-    if (userState.favorability === undefined) userState.favorability = 20;
-    if (userState.sanity === undefined) userState.sanity = 80;
+    if (userState.favorability === undefined) userState.favorability = 50;
+    if (userState.sanity === undefined) userState.sanity = 50;
     if (userState.fatePoints === undefined) userState.fatePoints = 1000;
     if (!userState.dynamicContent) userState.dynamicContent = { lastGenerated: 0, items: [] };
 }

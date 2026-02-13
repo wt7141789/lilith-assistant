@@ -168,8 +168,8 @@ export const PERSONA_DB = {
 
 
 export const DEFAULT_STATE = { 
-    favorability: 20, 
-    sanity: 80, 
+    favorability: 50, 
+    sanity: 50, 
     lastMsgHash: '',
     fatePoints: 1000, 
     gachaInventory: [], 

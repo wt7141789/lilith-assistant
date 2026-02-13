@@ -707,20 +707,27 @@ ${chatLog}
         if (name === "催眠洗脑" && reply) {
             const cleanNote = reply.replace(/```/g, '').trim();
             this.sendToSillyTavern(parentWin, cleanNote + "\n", false);
-            toolOutput.innerHTML = `<div style="color:#0f0;">✅ 注入完成</div><div style="font-size:10px; color:#888;">${cleanNote}</div>`;
+            toolOutput.innerHTML = `<div style="color:#0f0;">✅ 注入完成</div><div style="font-size:10px; color:#888; border-left:2px solid #0f0; padding-left:5px; margin-top:5px;">${cleanNote}</div>`;
             AudioSys.speak("哼，脑子坏掉了吧。");
             UIManager.showBubble("催眠指令已填入。");
         }
         else if (isInteractive && reply) {
-            toolOutput.innerHTML = `<div class="tool-result-header">💠 ${name}结果</div><div id="branch-container"></div>`;
+            const currentPersona = userState.activePersona || 'toxic';
+            const personaClass = `p-${currentPersona}`;
+            toolOutput.innerHTML = `<div class="tool-result-header">💠 ${name}结果</div><div id="branch-container" class="${personaClass}"></div>`;
             const container = document.getElementById('branch-container');
             
             if (name === "强制福利事件") {
+                 // 支持 Markdown 渲染
+                 const formattedItem = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+                     ? SillyTavern.getContext().messageFormatting(reply, 'lilith', false, false)
+                     : reply;
+
                  const card = document.createElement('div');
                  card.className = 'branch-card';
-                 card.style.borderColor = '#ff0055';
-                 card.style.background = 'rgba(255,0,85,0.1)';
-                 card.innerHTML = `<div style="font-size:10px; color:#ff0055">[福利事件]</div><div style="font-size:12px; color:#ddd;">${reply}</div>`;
+                 card.style.borderColor = 'var(--l-ui-border)';
+                 card.style.background = 'rgba(var(--l-ui-border-rgb), 0.1)';
+                 card.innerHTML = `<div style="font-size:10px; color:var(--l-ui-border)">[福利事件]</div><div style="font-size:12px; color:#ddd; line-height:1.4;">${formattedItem}</div>`;
                  card.onclick = () => { this.sendToSillyTavern(parentWin, reply, false); };
                  container.appendChild(card);
                  return;
@@ -747,10 +754,15 @@ ${chatLog}
                     else if (tag.includes("变态") || tag.includes("奇怪")) colorStyle = "border-color: #bd00ff; background: rgba(189,0,255,0.1);";
                 }
 
+                // 支持 Markdown 渲染
+                const formattedContent = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+                    ? SillyTavern.getContext().messageFormatting(content, 'lilith', false, false)
+                    : content;
+
                 const card = document.createElement('div');
                 card.className = 'branch-card';
                 card.style.cssText = `margin-bottom:8px; padding:10px; border:1px solid; border-left-width:4px; cursor:pointer; transition:0.2s; ${colorStyle}`;
-                card.innerHTML = `<div style="font-size:10px; font-weight:bold; color:#aaa; margin-bottom:4px;">[${tagDisplay}]</div><div style="font-size:12px; color:#ddd; line-height:1.4;">${content}</div>`;
+                card.innerHTML = `<div style="font-size:10px; font-weight:bold; color:#aaa; margin-bottom:4px;">[${tagDisplay}]</div><div style="font-size:12px; color:#ddd; line-height:1.4;">${formattedContent}</div>`;
 
                 card.onclick = () => {
                     card.style.opacity = '0.5'; card.style.transform = 'scale(0.98)';

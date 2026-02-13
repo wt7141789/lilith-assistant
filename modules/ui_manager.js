@@ -958,22 +958,74 @@ export const UIManager = {
 
             // Buttons - Clear Mem
             document.getElementById('cfg-clear-mem')?.addEventListener('click', () => {
-                if(confirm("警告：这将清除所有长期记忆和好感度数据！")) {
-                    userState.memoryArchive = [];
-                    userState.favorability = 20;
-                    userState.sanity = 80;
-                    userState.fatePoints = 1000;
+                if(confirm("【格式化确认】\n这将重置当前人格的所有数据（好感、理智、记忆、背包、工具输出、AI构思内容）。\n\n是否继续？")) {
+                    const cleanChat = confirm("是否同时清理主聊天框中的所有莉莉丝点评标签？\n(这会从消息正文中彻底删除 [莉莉丝] ... [/莉莉丝] 内容，刷新页面后也不会再出现)");
                     
-                    // Clear Chat History
+                    // 1. 重置数值与状态 (根据 50/50 最新标准)
+                    userState.memoryArchive = [];
+                    userState.favorability = 50;
+                    userState.sanity = 50;
+                    userState.fatePoints = 1000;
+                    userState.gachaInventory = [];
+                    userState.lastMsgHash = '';
+                    
+                    // 2. 清理 UI 缓存与工具输出
+                    const toolOutput = document.getElementById('tool-output-area');
+                    if (toolOutput) toolOutput.innerHTML = '';
+                    
+                    const bubble = document.getElementById(bubbleId);
+                    if (bubble) bubble.remove();
+
+                    // 3. 重置 AI 构思内容 (大脑皮层)
+                    if (userState.dynamicContent) {
+                        userState.dynamicContent = { lastGenerated: 0, items: [] };
+                    }
+                    
+                    // 4. 清理插件内部聊天记录
                     panelChatHistory.length = 0;
                     saveChat();
                     const chatHistoryDiv = document.getElementById('lilith-chat-history');
                     if (chatHistoryDiv) chatHistoryDiv.innerHTML = '';
 
+                    // 4. 清理 SillyTavern 主聊天历史记录中的标签
+                    if (cleanChat) {
+                        try {
+                            const context = SillyTavern.getContext();
+                            const chat = context.chat || [];
+                            let modifiedCount = 0;
+                            
+                            chat.forEach(msg => {
+                                if (msg.mes && (msg.mes.includes('[莉莉丝]') || msg.mes.includes('lilith-chat-ui'))) {
+                                    const oldMes = msg.mes;
+                                    // 彻底移除标签块
+                                    msg.mes = msg.mes.replace(/\n?\[莉莉丝\][\s\S]*?\[\/莉莉丝\]\n?/g, '\n').trim();
+                                    // 移除可能存在的 HTML 注入（兜底）
+                                    msg.mes = msg.mes.replace(/<div class="lilith-chat-ui-wrapper">[\s\S]*?<\/div><\/div>/g, '').trim();
+                                    // 兜底：处理没有闭合标签的旧版消息或错误截断的消息
+                                    msg.mes = msg.mes.replace(/\n?\[莉莉丝\][\s\S]*?(?=\n\n|$)/g, '').trim();
+                                    
+                                    if (oldMes !== msg.mes) modifiedCount++;
+                                }
+                            });
+
+                            if (modifiedCount > 0) {
+                                if (typeof SillyTavern.saveChat === 'function') SillyTavern.saveChat();
+                                // 触发重新渲染以更新 UI
+                                document.querySelectorAll('.mes').forEach(el => {
+                                    const mesid = el.getAttribute('mesid');
+                                    if (mesid) context.eventSource.emit(context.event_types.MESSAGE_UPDATED, parseInt(mesid));
+                                });
+                                console.log(`[Lilith] Cleaned ${modifiedCount} messages in ST chat.`);
+                            }
+                        } catch (e) {
+                            console.error('[Lilith] SillyTavern chat cleanup failed:', e);
+                        }
+                    }
+
                     saveState();
                     this.updateUI();
                     this.renderMemoryUI();
-                    alert("记忆核心已格式化。");
+                    alert("莉莉丝的记忆核心已格式化。" + (cleanChat ? "\n主聊天历史记录也已净化。" : ""));
                 }
             });
 
@@ -1244,16 +1296,65 @@ export const UIManager = {
 
     // --- UI 交互 ---
     showBubble(msg, color = null, className = '') {
+        const avatar = document.getElementById(avatarId);
+        const container = document.getElementById(containerId);
+        if (!avatar || !container) return;
+
         let b = document.getElementById(bubbleId); if (b) b.remove();
         b = document.createElement('div'); b.id = bubbleId; 
         if (color) b.style.borderColor = color;
-        if (className) b.className = className;
+
+        // [NEW] 支持气泡内的 Markdown 格式化
+        const formattedMsg = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+            ? SillyTavern.getContext().messageFormatting(msg, 'lilith', false, false)
+            : msg;
         
-        b.innerHTML = `<span style="color:var(--l-cyan)">[莉莉丝]</span> ${msg.length > 200 ? msg.substring(0, 198) + "..." : msg}`;
+        // --- 核心：漫画对白式动态避障算法 ---
+        const rect = avatar.getBoundingClientRect();
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        const bubbleWidth = 220; // 气泡预估宽度+间距
+        const bubbleHeight = 120; // 气泡预估高度+间距
+
+        let posClass = 'pos-top'; // 优先上方
+
+        // 计算各方向剩余空间
+        const spaceTop = rect.top;
+        const spaceBottom = winH - rect.bottom;
+        const spaceLeft = rect.left;
+        const spaceRight = winW - rect.right;
+
+        // 决策逻辑
+        if (spaceTop < bubbleHeight) {
+            // 上方挤不下了
+            if (spaceBottom > bubbleHeight) {
+                posClass = 'pos-bottom';
+            } else if (spaceLeft > bubbleWidth) {
+                posClass = 'pos-left';
+            } else if (spaceRight > bubbleWidth) {
+                posClass = 'pos-right';
+            } else {
+                // 四周都挤，默认回退
+                posClass = 'pos-top';
+            }
+        } else {
+            // 上方能放下，但如果太靠左右边缘，Top气泡的一半会被遮挡
+            if (spaceLeft < bubbleWidth / 2) {
+                posClass = 'pos-right';
+            } else if (spaceRight < bubbleWidth / 2) {
+                posClass = 'pos-left';
+            }
+        }
+
+        const currentPersona = userState.activePersona || 'toxic';
+        const personaClass = `p-${currentPersona}`;
+        b.className = `lilith-interact-bubble ${posClass} ${personaClass} ${className}`.trim();
+        b.innerHTML = `<span style="color:var(--l-ui-border)">[莉莉丝]</span> ${formattedMsg.length > 500 ? formattedMsg.substring(0, 498) + "..." : formattedMsg}`;
+        
         if (userState.sanity < 30) b.style.borderColor = '#ff0000';
         b.onclick = () => b.remove();
-        const container = document.getElementById(containerId);
-        if (container) container.appendChild(b);
+        container.appendChild(b);
+
         const duration = Math.max(5000, msg.length * 350);
         setTimeout(() => { if (b.parentNode) b.remove(); }, duration);
     },
@@ -1434,6 +1535,11 @@ export const UIManager = {
         const div = document.getElementById('lilith-chat-history');
         if (!div) return;
 
+        // [NEW] 支持内部聊天框的 Markdown 格式化
+        const formattedText = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+            ? SillyTavern.getContext().messageFormatting(text, 'lilith', false, false)
+            : text;
+
         // 1. 如果是 lilith，先处理数值变动
         let displayTagName = text;
         if (role === 'lilith') {
@@ -1455,18 +1561,24 @@ export const UIManager = {
         }
 
         const optimizedText = displayTagName;
+        const currentPersona = userState.activePersona || 'toxic';
+        const personaClass = `p-${currentPersona}`;
 
         const msgNode = document.createElement('div');
-        msgNode.className = `msg ${role}`;
+        msgNode.className = `msg ${role} ${personaClass}`;
         
         if (role === 'lilith') {
-            const currentPersona = userState.activePersona || 'toxic';
             const pack = AvatarPacks[currentPersona] || AvatarPacks['meme'];
             const face = userState.currentFace || 'normal';
             const avatarUrl = pack[face] || pack['normal'] || pack['happy'] || AvatarPacks['meme']['normal'];
 
             const { inner, status, action, speech } = this.parseLilithMsg(optimizedText);
             
+            // 内部二次格式化解析后的正文
+            const formattedSpeech = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+                ? SillyTavern.getContext().messageFormatting(speech || optimizedText, 'lilith', false, false)
+                : (speech || optimizedText);
+
             let html = `<img class="lilith-chat-avatar" src="${avatarUrl}" alt="">`;
             html += `<div class="lilith-chat-content">`;
 
@@ -1476,15 +1588,18 @@ export const UIManager = {
                 if (inner) html += `<div class="l-inner-thought">💭 ${inner}</div>`;
                 if (action) html += `<div class="l-action-text">* ${action} *</div>`;
                 if (speech || (!inner && !action)) {
-                    html += `<div class="l-speech-text">${speech || optimizedText}</div>`;
+                    html += `<div class="l-speech-text">${formattedSpeech}</div>`;
                 }
             } else {
-                html += `<div>${optimizedText}</div>`;
+                html += `<div>${formattedSpeech}</div>`;
             }
             html += `</div>`;
             msgNode.innerHTML = html;
         } else {
-            msgNode.textContent = optimizedText;
+            // 用户消息也支持格式化 (Markdown渲染)
+            msgNode.innerHTML = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
+                ? SillyTavern.getContext().messageFormatting(optimizedText, 'user', false, false)
+                : optimizedText;
         }
 
         div.appendChild(msgNode);
@@ -1518,7 +1633,7 @@ export const UIManager = {
             $mode.val(userState.commentMode || 'random');
             $hideAvatar.prop('checked', userState.hideAvatar);
             $autoSend.prop('checked', userState.autoSend !== false);
-            $avatarSize.val(userState.avatarSize || 150);
+            $avatarSize.val(userState.avatarSize || 100);
             $persona.val(userState.activePersona || 'toxic');
             $dashStyle.val(userState.dashboardStyle || 'modern');
             $dashInject.prop('checked', userState.injectDashboard);
@@ -1885,12 +2000,18 @@ export const UIManager = {
             });
 
             $('#lilith-reset-state').on('click', () => {
-                if (confirm('确定要重置莉莉丝的状态吗？这会清空好感度与记忆（仅限当前选中人格）。')) {
-                    userState.favorability = 20;
-                    userState.sanity = 80;
+                if (confirm('确定要彻底格式化当前人格吗？这会清空好感度(50)、理智(50)、记忆、背包和对话历史。')) {
+                    // 同步最新 50/50 标准
+                    userState.favorability = 50;
+                    userState.sanity = 50;
                     userState.fatePoints = 1000;
                     userState.gachaInventory = [];
                     userState.memoryArchive = [];
+                    userState.lastMsgHash = '';
+                    
+                    if (userState.dynamicContent) {
+                        userState.dynamicContent = { lastGenerated: 0, items: [] };
+                    }
                     
                     // 清除对话历史
                     panelChatHistory.length = 0;
@@ -1898,11 +2019,15 @@ export const UIManager = {
                     const chatHistoryDiv = document.getElementById('lilith-chat-history');
                     if (chatHistoryDiv) chatHistoryDiv.innerHTML = '';
 
+                    // 同时也清理工具输出区域
+                    const toolOutput = document.getElementById('tool-output-area');
+                    if (toolOutput) toolOutput.innerHTML = '';
+
                     // 持久化保存
                     saveState();
                     this.updateUI();
                     this.renderMemoryUI();
-                    alert('当前人格状态已重置');
+                    alert('当前人格状态已归零重置 (50%/50%)');
                 }
             });
 
@@ -2116,6 +2241,11 @@ export const UIManager = {
             // --- 使用复用的解析逻辑 ---
             const { inner, status, action, speech } = this.parseLilithMsg(commentText);
 
+            // [NEW] 调用酒馆原生的消息格式化逻辑，支持 Markdown、表情、变量等
+            const formattedSpeech = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting) 
+                ? SillyTavern.getContext().messageFormatting(speech || commentText, 'lilith', false, false)
+                : (speech || commentText);
+
             // 构建新版 UI
             const currentPersona = userState.activePersona || 'toxic';
             const pack = AvatarPacks[currentPersona] || AvatarPacks['meme'];
@@ -2128,14 +2258,17 @@ export const UIManager = {
             
             const avatarUrl = pack[faceKey] || pack['normal'];
 
-            let html = '<div class="lilith-chat-ui-wrapper"><div class="lilith-chat-ui">';
+            // 动态选择人格配色类
+            const personaClass = `p-${currentPersona}`;
+
+            let html = `<div class="lilith-chat-ui-wrapper"><div class="lilith-chat-ui ${personaClass}">`;
             if (status) html += `<div class="l-status-bar">🩸 ${status}</div>`;
             if (inner) html += `<div class="l-inner-thought">💭 ${inner}</div>`;
             if (action) html += `<div class="l-action-text">* ${action} *</div>`;
             
             html += `<div class="l-speech-wrapper">
                         <div class="lilith-chat-avatar" style="background-image: url('${avatarUrl}')"></div>
-                        <div class="l-speech-text">${speech || commentText}</div>
+                        <div class="l-speech-text">${formattedSpeech}</div>
                      </div>`;
             html += '</div></div>';
 
