@@ -1643,21 +1643,31 @@ export const UIManager = {
                 };
             }
         } else {
-            // --- 用户消息增强：修复头像路径与排列逻辑 ---
+            // --- 用户消息增强：深度兼容头像获取 ---
             let userAvatarUrl = '/img/two-faced.png'; 
-            if (ctx && typeof ctx.getThumbnailUrl === 'function') {
-                const userAvatar = ctx.user_avatar || (ctx.settings && ctx.settings.user_avatar) || 'default_user.png';
-                // 使用官方推荐的获取缩略图接口
-                userAvatarUrl = ctx.getThumbnailUrl('user_avatar', userAvatar);
+            if (ctx) {
+                // 1. 尝试从当前正在使用的玩家配置中直接带出头像
+                const userAvatar = ctx.user_avatar || (ctx.settings && ctx.settings.user_avatar);
+                
+                if (userAvatar && typeof ctx.getThumbnailUrl === 'function') {
+                    userAvatarUrl = ctx.getThumbnailUrl('user_avatar', userAvatar);
+                } else {
+                    // 2. 备选方案：由于多用户环境下 context 结构可能不同，直接尝试寻找 DOM
+                    const domUserAvatar = document.querySelector('#content_avatar img, .mes.user .avatar img');
+                    if (domUserAvatar && domUserAvatar.src) {
+                        userAvatarUrl = domUserAvatar.src;
+                    }
+                }
             }
 
             msgNode.className += ' user-msg-with-avatar';
             
-            // 构造 HTML：保持与莉莉丝一致的结构
+            // 构造 HTML：保持与莉莉丝一致的 HTML 结构，确保 CSS 能够复用
             let html = `<img class="lilith-chat-avatar user-avatar" src="${userAvatarUrl}" 
-                     onerror="this.src='/User%20Avatars/default_user.png'; this.onerror=null;" 
+                     onerror="this.src='/img/two-faced.png'; this.onerror=null;" 
                      alt="User">`;
             
+            // 玩家气泡：完全复用 lilith-chat-content 类，仅通过额外的 user-chat-bubble 类名区分色调
             html += `<div class="lilith-chat-content user-chat-bubble">`;
             html += `<div class="l-speech-text">${formattedText || text}</div>`;
             html += `</div>`;
