@@ -11,8 +11,8 @@ export const InnerWorldManager = {
     
     // 映射外部表格及其用途 (深度扩展关键词以支持 13.40+ 版本习惯)
     tableMapping: {
-        protagonist: ['主角', '玩家', 'Player', 'Protagonist', '主控', '自我介绍', '人物卡', 'PC属性', '基础属性'],
-        global: ['系统', '全局', 'System', 'Global', '世界设定', '世界观', '背景', '基础设置', '参数', '记录仪', '全局变量', '通用', '世界参量', '世界参数', 'World'],
+        protagonist: ['主角信息', '主角', '玩家', 'Player', 'Protagonist', '主控', '自我介绍', '人物卡', 'PC属性', '基础属性'],
+        global: ['全局数据', '系统', '全局', 'System', 'Global', '世界设定', '世界观', '背景', '基础设置', '参数', '记录仪', '全局变量', '通用', '世界参量', '世界参数', 'World'],
         skills: ['技能', '能力', 'Skills', 'Abilities', '法术', '招式', '专长', '武学', '魔法', '战技', '武魂', '天赋'],
         characters: ['重要人物', '重要实体', '人物', '角色', 'Characters', 'NPC', '关系', '好感度', '势力', '伙伴', '攻略对象', '羁绊'],
         tasks: ['任务', '进度', 'Tasks', 'Quests', '剧本', '里程碑', '目标', '历程', '剧情推进', '当前目标', '成就'],
@@ -327,16 +327,16 @@ export const InnerWorldManager = {
         
         // 模式 B: 胶囊清单提取 (多行数据的核心列)
         if (rule === 'capsule') {
-            // 如果指定了核心列，且未超出范围，则优先使用
-            let nameIdx = (preferredCol >= 0 && preferredCol < headers.length) ? preferredCol : -1;
+            // A. 第一优先级：自动寻找最像“名称”的列
+            let nameIdx = headers.findIndex(h => h && /名称|名字|name|人物|角色|技能|物品|道具|描述|核心|标题/i.test(h));
             
-            // 如果没有指定或指定无效，则自动寻找最像“名称”的列
-            if (nameIdx === -1) {
-                nameIdx = headers.findIndex(h => h && /名称|名字|name|人物|角色|技能|物品|道具|描述|核心|标题/i.test(h));
+            // B. 第二优先级：如果没找到名称列，且指定了有效核心列，则使用指定列
+            if (nameIdx === -1 && preferredCol >= 0 && preferredCol < headers.length) {
+                nameIdx = preferredCol;
             }
             
+            // C. 第三优先级：避开 ID 类的第一列，尝试寻找第一列或第二列
             if (nameIdx === -1) {
-                // 避开 ID 类的第一列
                 const firstColHeader = (headers[0] || '').toLowerCase();
                 const isJunk = junkKeywords.some(k => firstColHeader.includes(k)) && !priorityKeys.includes(headers[0]);
                 nameIdx = (isJunk || /^\d+$/.test(String(content[1]?.[0] || ''))) ? 1 : 0;
@@ -445,10 +445,31 @@ export const InnerWorldManager = {
 
         let slotHtml = '';
         slots.forEach(slot => {
-            const targetId = Object.keys(db).find(id => {
-                const name = db[id]?.name || id;
-                return slot.kw.some(k => name.toLowerCase().includes(k.toLowerCase()));
-            });
+            // 改进寻表逻辑：优先根据关键字顺序进行精确或半精确匹配
+            let targetId = null;
+            
+            // 阶段 1: 寻找最匹配的关键字
+            for (const k of slot.kw) {
+                targetId = Object.keys(db).find(id => {
+                    const tableName = (db[id]?.name || id).toLowerCase();
+                    const key = k.toLowerCase();
+                    // 精确匹配，或者包含“表/表格”后缀的匹配
+                    return tableName === key || tableName === key + '表' || tableName === key + '表格';
+                });
+                if (targetId) break;
+            }
+            
+            // 阶段 2: 如果没找到，退而求其次寻找模糊包含（仍遵循关键字优先级）
+            if (!targetId) {
+                for (const k of slot.kw) {
+                    targetId = Object.keys(db).find(id => {
+                        const tableName = (db[id]?.name || id).toLowerCase();
+                        return tableName.includes(k.toLowerCase());
+                    });
+                    if (targetId) break;
+                }
+            }
+
             const targetTable = targetId ? db[targetId] : null;
             if (targetTable) {
                 const info = this.extractByRule(targetTable, targetId, slot.rule, 30, slot.priority || [], slot.preferredCol);
@@ -1287,10 +1308,25 @@ export const InnerWorldManager = {
         let hasData = false;
 
         slots.forEach(slot => {
-            const targetId = Object.keys(db).find(id => {
-                const name = db[id]?.name || id;
-                return slot.kw.some(k => name.toLowerCase().includes(k.toLowerCase()));
-            });
+            let targetId = null;
+            // 按优先级寻找匹配表格
+            for (const k of slot.kw) {
+                targetId = Object.keys(db).find(id => {
+                    const tableName = (db[id]?.name || id).toLowerCase();
+                    const key = k.toLowerCase();
+                    return tableName === key || tableName === key + '表' || tableName === key + '表格';
+                });
+                if (targetId) break;
+            }
+            if (!targetId) {
+                for (const k of slot.kw) {
+                    targetId = Object.keys(db).find(id => {
+                        const tableName = (db[id]?.name || id).toLowerCase();
+                        return tableName.includes(k.toLowerCase());
+                    });
+                    if (targetId) break;
+                }
+            }
             
             if (targetId && db[targetId]) {
                 const info = this.extractByRule(db[targetId], targetId, slot.rule, 15, [], slot.preferredCol);
