@@ -120,8 +120,8 @@ export function validateState() {
     }
 
     // Ensure basic numeric fields exist
-    if (userState.favorability === undefined) userState.favorability = 50;
-    if (userState.sanity === undefined) userState.sanity = 50;
+    if (userState.favorability === undefined) userState.favorability = 20;
+    if (userState.sanity === undefined) userState.sanity = 80;
     if (userState.fatePoints === undefined) userState.fatePoints = 1000;
     if (!userState.dynamicContent) userState.dynamicContent = { lastGenerated: 0, items: [] };
 }

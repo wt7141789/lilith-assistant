@@ -974,10 +974,10 @@ export const UIManager = {
                 if(confirm("【格式化确认】\n这将重置当前人格的所有数据（好感、理智、记忆、背包、工具输出、AI构思内容）。\n\n是否继续？")) {
                     const cleanChat = confirm("是否同时清理主聊天框中的所有莉莉丝点评标签？\n(这会从消息正文中彻底删除 [莉莉丝] ... [/莉莉丝] 内容，刷新页面后也不会再出现)");
                     
-                    // 1. 重置数值与状态 (根据 50/50 最新标准)
+                    // 1. 重置数值与状态 (初始化修正：好感20/理智80)
                     userState.memoryArchive = [];
-                    userState.favorability = 50;
-                    userState.sanity = 50;
+                    userState.favorability = 20;
+                    userState.sanity = 80;
                     userState.fatePoints = 1000;
                     userState.gachaInventory = [];
                     userState.lastMsgHash = '';
@@ -2104,10 +2104,10 @@ export const UIManager = {
             });
 
             $('#lilith-reset-state').on('click', () => {
-                if (confirm('确定要彻底格式化当前人格吗？这会清空好感度(50)、理智(50)、记忆、背包和对话历史。')) {
-                    // 同步最新 50/50 标准
-                    userState.favorability = 50;
-                    userState.sanity = 50;
+                if (confirm('确定要彻底格式化当前人格吗？这会清空好感度(20)、理智(80)、记忆、背包和对话历史。')) {
+                    // 同步最新 20/80 标准
+                    userState.favorability = 20;
+                    userState.sanity = 80;
                     userState.fatePoints = 1000;
                     userState.gachaInventory = [];
                     userState.memoryArchive = [];
@@ -2131,7 +2131,7 @@ export const UIManager = {
                     saveState();
                     this.updateUI();
                     this.renderMemoryUI();
-                    alert('当前人格状态已归零重置 (50%/50%)');
+                    alert('当前人格状态已归零重置 (好感20/理智80)');
                 }
             });
 
