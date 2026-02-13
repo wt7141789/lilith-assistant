@@ -1561,9 +1561,12 @@ export const UIManager = {
         const div = document.getElementById('lilith-chat-history');
         if (!div) return;
 
-        // [NEW] 支持内部聊天框的 Markdown 格式化
-        const formattedText = (typeof SillyTavern !== 'undefined' && SillyTavern.getContext().messageFormatting)
-            ? SillyTavern.getContext().messageFormatting(text, 'lilith', false, false)
+        const ctx = (typeof SillyTavern !== 'undefined') ? SillyTavern.getContext() : null;
+
+        // [NEW] 支持内部聊天框的 Markdown 渲染
+        // 注意：用户消息不应使用 'lilith' 角色防止正则提取规则将正文过滤掉
+        const formattedText = (ctx && ctx.messageFormatting)
+            ? ctx.messageFormatting(text, role === 'lilith' ? 'lilith' : 'user', false, false)
             : text;
 
         // 1. 如果是 lilith，先处理数值变动
@@ -1618,33 +1621,46 @@ export const UIManager = {
                 if (inner) html += `<div class="l-inner-thought">💭 ${inner}</div>`;
                 if (action) html += `<div class="l-action-text">* ${action} *</div>`;
                 if (speech || (!inner && !action)) {
-                    html += `<div class="l-speech-text">${formattedSpeech}</div>`;
+                    html += `<div class="l-speech-text" style="position:relative;">${formattedSpeech}</div>`;
                 }
             } else {
-                html += `<div>${formattedSpeech}</div>`;
+                html += `<div style="position:relative;">${formattedSpeech}</div>`;
             }
+            
+            // 添加重读小喇叭
+            html += `<div class="lilith-tts-replay" title="重新朗读" style="position:absolute; bottom:5px; right:5px; cursor:pointer; opacity:0.3; font-size:12px; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.3">📢</div>`;
+            
             html += `</div>`;
             msgNode.innerHTML = html;
+
+            // 绑定小喇叭事件
+            const replayBtn = msgNode.querySelector('.lilith-tts-replay');
+            if (replayBtn) {
+                replayBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const { speech: replayText } = this.parseLilithMsg(optimizedText.replace(/\[[SF]:[+\-]?\d+\]/gi, ''));
+                    AudioSys.speak(replayText || optimizedText.replace(/\[[SF]:[+\-]?\d+\]/gi, ''));
+                };
+            }
         } else {
-            // --- 用户消息增强：修复头像与气泡样式 ---
-            const ctx = (typeof SillyTavern !== 'undefined') ? SillyTavern.getContext() : null;
+            // --- 用户消息增强：修复头像路径与排列逻辑 ---
             let userAvatarUrl = '/img/two-faced.png'; 
-            if (ctx) {
-                // 修复头像路径：兼容更多酒馆版本
+            if (ctx && typeof ctx.getThumbnailUrl === 'function') {
                 const userAvatar = ctx.user_avatar || (ctx.settings && ctx.settings.user_avatar) || 'default_user.png';
-                // 尝试缩略图接口，如果失败回退到原始路径
-                userAvatarUrl = `/thumbnail?type=user_avatar&file=${encodeURIComponent(userAvatar)}`;
+                // 使用官方推荐的获取缩略图接口
+                userAvatarUrl = ctx.getThumbnailUrl('user_avatar', userAvatar);
             }
 
             msgNode.className += ' user-msg-with-avatar';
             
-            // 构造精简的 HTML：移除名字，增强气泡
-            let html = `<div class="user-chat-content bubble-style">`;
-            html += `<div class="user-msg-body">${formattedText}</div>`;
-            html += `</div>`;
+            // 构造 HTML：保持与莉莉丝一致的结构
+            let html = `<img class="lilith-chat-avatar user-avatar" src="${userAvatarUrl}" 
+                     onerror="this.src='/User%20Avatars/default_user.png'; this.onerror=null;" 
+                     alt="User">`;
             
-            // 头像跟莉莉丝一致使用相同类名以获得外观联动
-            html += `<img class="lilith-chat-avatar user-avatar" src="${userAvatarUrl}" onerror="this.src='/User%20Avatars/default_user.png'" alt="User">`;
+            html += `<div class="lilith-chat-content user-chat-bubble">`;
+            html += `<div class="l-speech-text">${formattedText || text}</div>`;
+            html += `</div>`;
             
             msgNode.innerHTML = html;
         }
