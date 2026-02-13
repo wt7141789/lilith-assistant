@@ -1612,7 +1612,10 @@ export const UIManager = {
                 formattedSpeech = speech || optimizedText;
             }
 
-            let html = `<img class="lilith-chat-avatar" src="${avatarUrl}" alt="">`;
+            let html = `<div class="lilith-avatar-wrapper">
+                            <img class="lilith-chat-avatar" src="${avatarUrl}" alt="">
+                            <div class="lilith-tts-replay-btn" title="重新朗读">📢</div>
+                        </div>`;
             html += `<div class="lilith-chat-content">`;
 
             if (inner || status || (action && action.length > 0)) {
@@ -1627,50 +1630,52 @@ export const UIManager = {
                 html += `<div style="position:relative;">${formattedSpeech}</div>`;
             }
             
-            // 添加重读小喇叭
-            html += `<div class="lilith-tts-replay" title="重新朗读" style="position:absolute; bottom:5px; right:5px; cursor:pointer; opacity:0.3; font-size:12px; transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.3">📢</div>`;
-            
             html += `</div>`;
             msgNode.innerHTML = html;
 
             // 绑定小喇叭事件
-            const replayBtn = msgNode.querySelector('.lilith-tts-replay');
+            const replayBtn = msgNode.querySelector('.lilith-tts-replay-btn');
             if (replayBtn) {
                 replayBtn.onclick = (e) => {
                     e.stopPropagation();
                     const { speech: replayText } = this.parseLilithMsg(optimizedText.replace(/\[[SF]:[+\-]?\d+\]/gi, ''));
                     AudioSys.speak(replayText || optimizedText.replace(/\[[SF]:[+\-]?\d+\]/gi, ''));
+                    
+                    // 播放一个简单的缩放反馈
+                    replayBtn.style.transform = 'scale(1.3)';
+                    setTimeout(() => replayBtn.style.transform = 'scale(1)', 200);
                 };
             }
         } else {
-            // --- 用户消息增强：深度兼容头像获取 ---
+            // --- 用户消息增强：深度结构对齐与头像兼容 ---
             let userAvatarUrl = '/img/two-faced.png'; 
             if (ctx) {
-                // 1. 尝试从当前正在使用的玩家配置中直接带出头像
-                const userAvatar = ctx.user_avatar || (ctx.settings && ctx.settings.user_avatar);
+                // 彻底解决多用户/Docker/新旧版路径问题
+                const rawAvatar = ctx.user_avatar || (ctx.settings && ctx.settings.user_avatar) || 'default_user.png';
                 
-                if (userAvatar && typeof ctx.getThumbnailUrl === 'function') {
-                    userAvatarUrl = ctx.getThumbnailUrl('user_avatar', userAvatar);
+                if (typeof ctx.getThumbnailUrl === 'function') {
+                    userAvatarUrl = ctx.getThumbnailUrl('user_avatar', rawAvatar);
                 } else {
-                    // 2. 备选方案：由于多用户环境下 context 结构可能不同，直接尝试寻找 DOM
-                    const domUserAvatar = document.querySelector('#content_avatar img, .mes.user .avatar img');
-                    if (domUserAvatar && domUserAvatar.src) {
-                        userAvatarUrl = domUserAvatar.src;
-                    }
+                    // 兜底 1: 拼接标准缩略图路径
+                    userAvatarUrl = `/thumbnail?type=user_avatar&file=${encodeURIComponent(rawAvatar)}`;
+                }
+
+                // 尝试实时抓取玩家头像作为最高优先级兜底
+                const liveAvatar = document.querySelector('#content_avatar img, .mes.user .avatar img');
+                if (liveAvatar && liveAvatar.src && !liveAvatar.src.includes('undefined')) {
+                    userAvatarUrl = liveAvatar.src;
                 }
             }
 
-            msgNode.className += ' user-msg-with-avatar';
+            // --- 结构对齐：套用“头像包裹”模板 ---
+            msgNode.className += ' user-msg-style-sync'; 
             
-            // 构造 HTML：保持与莉莉丝一致的 HTML 结构，确保 CSS 能够复用
-            let html = `<img class="lilith-chat-avatar user-avatar" src="${userAvatarUrl}" 
-                     onerror="this.src='/img/two-faced.png'; this.onerror=null;" 
-                     alt="User">`;
-            
-            // 玩家气泡：完全复用 lilith-chat-content 类，仅通过额外的 user-chat-bubble 类名区分色调
-            html += `<div class="lilith-chat-content user-chat-bubble">`;
+            let html = `<div class="lilith-chat-content">`;
             html += `<div class="l-speech-text">${formattedText || text}</div>`;
             html += `</div>`;
+            html += `<img class="lilith-chat-avatar user-avatar-sync" src="${userAvatarUrl}" 
+                     onerror="this.src='/User%20Avatars/default_user.png'; this.onerror=function(){this.src='/img/two-faced.png'}" 
+                     alt="User">`;
             
             msgNode.innerHTML = html;
         }

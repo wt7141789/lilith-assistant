@@ -798,35 +798,58 @@ div.lilith-chat-ui:hover {
 .msg.lilith.p-imouto { background: linear-gradient(90deg, rgba(120, 60, 80, 0.3) 0%, rgba(60, 20, 30, 0.1) 100%); border-color: #ffb7c5; }
 .msg.lilith.p-meme  { background: linear-gradient(90deg, rgba(0, 40, 10, 0.3) 0%, rgba(0, 10, 0, 0.1) 100%); border-color: #00FF41; }
 
-/* 用户交互消息增强样式 */
-.msg.user.user-msg-with-avatar {
-    background: transparent !important;
+/* 用户交互消息增强样式：深度同步莉莉丝风格 */
+.msg.user.user-msg-style-sync {
+    background: linear-gradient(90deg, rgba(30, 30, 45, 0.4) 0%, rgba(50, 50, 70, 0.2) 100%) !important;
+    border-right: 3px solid #667eea !important; 
+    border-left: none !important;
     display: flex !important;
     gap: 12px !important;
     align-items: flex-start !important;
-    flex-direction: row-reverse !important; /* 玩家方：头像在右 */
-    border: none !important;
+    flex-direction: row !important; /* 内置内容顺序：文字 -> 头像 */
+    justify-content: flex-end;
+    border-radius: 8px !important;
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.2) !important;
     max-width: 95% !important;
     margin-left: auto !important;
-    padding: 10px 0 !important;
-    box-shadow: none !important;
+    padding: 10px 15px !important;
 }
 
-.user-chat-bubble {
-    flex: 1 !important;
-    background: linear-gradient(90deg, rgba(30, 30, 45, 0.95) 0%, rgba(50, 50, 70, 0.9) 100%) !important;
-    border-right: 4px solid #667eea !important; 
-    border-left: none !important;
-    padding: 12px 16px !important;
-    border-radius: 8px !important;
-    box-shadow: 0 0 15px rgba(102, 126, 234, 0.3), inset 0 0 10px rgba(0,0,0,0.3) !important;
-    color: #eee !important;
-    font-size: 13px;
-    line-height: 1.5;
-    text-align: left;
-    min-height: 20px;
+.user-avatar-sync {
+    order: 2; /* 确保头像在最右侧 */
+    border-color: #667eea !important;
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.4);
+}
+
+.msg.user.user-msg-style-sync .lilith-chat-content {
+    order: 1; /* 文字在左侧 */
+    text-align: right;
+    color: #ddd;
+}
+
+/* 莉莉丝头像与语音按钮包装器 */
+.lilith-avatar-wrapper {
     position: relative;
-    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.lilith-tts-replay-btn {
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all 0.2s;
+    user-select: none;
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+}
+
+.lilith-tts-replay-btn:hover {
+    opacity: 1;
+    transform: scale(1.2);
+    text-shadow: 0 0 8px var(--l-main);
 }
 
 .user-chat-bubble:hover {
