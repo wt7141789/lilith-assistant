@@ -1654,13 +1654,18 @@ export const UIManager = {
             const $dashStyle = $('#lilith-dashboard-style');
             const $dashInject = $('#lilith-inject-dashboard');
 
+            // 动态注入人格选项，确保与悬浮窗配置一致
+            $persona.empty();
+            Object.keys(PERSONA_DB).forEach(k => {
+                $persona.append(`<option value="${k}" ${userState.activePersona === k ? 'selected' : ''}>${PERSONA_DB[k].name}</option>`);
+            });
+
             $freq.val(userState.commentFrequency || 0);
             $freqVal.text(`${userState.commentFrequency || 0}%`);
             $mode.val(userState.commentMode || 'random');
             $hideAvatar.prop('checked', userState.hideAvatar);
             $autoSend.prop('checked', userState.autoSend !== false);
             $avatarSize.val(userState.avatarSize || 100);
-            $persona.val(userState.activePersona || 'toxic');
             $dashStyle.val(userState.dashboardStyle || 'modern');
             $dashInject.prop('checked', userState.injectDashboard);
 
