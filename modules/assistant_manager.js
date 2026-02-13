@@ -833,10 +833,10 @@ Return ONLY a valid JSON array. Each object MUST follow this schema:
 normal, angry, speechless, mockery, horny, happy, disgust, love
 
 [CONSTRAINTS]
-- Type "dialogue": Short, sharp, personality-driven dialogues Lilith says to the user.
-- Type "event": Vivid descriptions of Lilith's actions. 
-- MANDATORY for Type "event": Every event MUST have an "effect" object with non-zero values for "favor" or "sanity". An event without numeric impact is INVALID.
-- Effect range: favor: -5 to 5, sanity: -10 to 10.
+- Type "dialogue": Short, sharp dialogues Lilith says to the user. (DO NOT include "[莉莉丝]" or any prefix)
+- Type "event": Vivid descriptions of Lilith's actions. (DO NOT include "[莉莉丝]" or any prefix)
+- MANDATORY for Type "event": Every event MUST have an "effect" object with non-zero values for "favor" or "sanity".
+- STATS RANGE: favor: -2 to 2, sanity: -2 to 2. (Strict limit for balance)
 - Language: Chinese.
 - JSON MUST BE VALID.`;
 
@@ -983,12 +983,16 @@ ${chatLog}
                     const items = userState.dynamicContent?.items || [];
                     if (items.length === 0) return;
 
-                    const item = items[Math.floor(Math.random() * items.length)];
-                    // console.log('[Lilith] Dynamic item triggered:', item); // Removed for anti-spoiler
+                    // 随机选取一个条目并记录索引
+                    const idx = Math.floor(Math.random() * items.length);
+                    const item = items[idx];
+                    
+                    // 对内容进行初步清理，防止 AI 强行带入前缀
+                    let cleanContent = item.content.replace(/^\[莉莉丝\][:：\s]*/, '').replace(/^莉莉丝[:：\s]*/, '').trim();
                     
                     if (item.type === 'dialogue') {
-                        UIManager.showBubble(item.content);
-                        AudioSys.speak(item.content);
+                        UIManager.showBubble(cleanContent);
+                        AudioSys.speak(cleanContent);
                         // 统一从 effect.face 取表情
                         const face = item.effect?.face || item.face;
                         if (face) {
@@ -996,9 +1000,9 @@ ${chatLog}
                             setTimeout(() => UIManager.setAvatar('idle'), 8000);
                         }
                     } else {
-                        // 特殊事件
-                        UIManager.showBubble(`【特殊事件】\n${item.content}`, "#bd00ff", "special-event");
-                        AudioSys.speak("发生了一些有趣的事呢。");
+                        // 突发事件 (特殊处理前缀)
+                        UIManager.showBubble(`[突发事件]\n${cleanContent}`, "#bd00ff", "special-event");
+                        AudioSys.speak(cleanContent); // 莉莉丝朗读事件内容
                         
                         const e = item.effect || {};
                         if (e.face) {
@@ -1006,16 +1010,23 @@ ${chatLog}
                             setTimeout(() => UIManager.setAvatar('idle'), 10000);
                         }
                         
-                        // 数值变动并同步更新 UI
+                        // 数值变动并同步更新 UI (控制在 +-2 之内)
                         if (e.favor) {
-                            const val = updateFavor(e.favor, () => UIManager.updateUI());
+                            const favorDelta = Math.max(-2, Math.min(2, Number(e.favor)));
+                            const val = updateFavor(favorDelta, () => UIManager.updateUI());
                             setTimeout(() => UIManager.showStatusChange(`好感 ${val > 0 ? '+' : ''}${val}`, "#ff0055"), 1200);
                         }
                         if (e.sanity) {
-                            const val = updateSanity(e.sanity, () => UIManager.updateUI());
+                            const sanityDelta = Math.max(-2, Math.min(2, Number(e.sanity)));
+                            const val = updateSanity(sanityDelta, () => UIManager.updateUI());
                             setTimeout(() => UIManager.showStatusChange(`理智 ${val > 0 ? '+' : ''}${val}`, "#00e5ff"), 2000);
                         }
                     }
+
+                    // [防重复] 触发后立即从列表中移除该条目
+                    items.splice(idx, 1);
+                    userState.dynamicContent.items = items;
+                    saveState();
                 }
             },
             {
