@@ -280,15 +280,16 @@ export const InnerWorldManager = {
      * @param {String} tableId 表格唯一标识
      * @param {String} rule 'kv' (属性对) 或 'capsule' (清单列表)
      * @param {Array} priorityKeys 优先排序并显示的键名 (用于汇总看板)
+     * @param {Number} preferredCol 预期的核心列索引 (-1 则自动探测)
      */
-    extractByRule(table, tableId, rule = 'kv', maxRows = 30, priorityKeys = []) {
+    extractByRule(table, tableId, rule = 'kv', maxRows = 30, priorityKeys = [], preferredCol = -1) {
         if (!table || !table.content || table.content.length === 0) return null;
         
         const content = table.content.filter(row => row && row.length > 0);
         if (content.length === 0) return null;
         
         const headers = (content[0] || []).map(h => (h === null || h === undefined) ? '' : String(h).trim());
-        const junkKeywords = ['id', '序号', 'index', 'idx', 'no', 'guid', 'uid', 'time', '更新', '创建', '像素', 'uuid', '__v', '时间', 'null', 'undefined'];
+        const junkKeywords = ['id', '序号', 'index', 'idx', 'no', 'guid', 'uid', 'time', '更新', '创建', '像素', 'uuid', '__v', '时间', 'null', 'undefined', '编码索引', '索引', 'key'];
         
         // 模式 A: 键值对提取 (表头 + 第一行数据)
         if (rule === 'kv') {
@@ -326,8 +327,14 @@ export const InnerWorldManager = {
         
         // 模式 B: 胶囊清单提取 (多行数据的核心列)
         if (rule === 'capsule') {
-            // 自动寻找最像“名称”的列
-            let nameIdx = headers.findIndex(h => h && /名称|名字|name|人物|角色|技能|物品|道具|描述|核心|标题/i.test(h));
+            // 如果指定了核心列，且未超出范围，则优先使用
+            let nameIdx = (preferredCol >= 0 && preferredCol < headers.length) ? preferredCol : -1;
+            
+            // 如果没有指定或指定无效，则自动寻找最像“名称”的列
+            if (nameIdx === -1) {
+                nameIdx = headers.findIndex(h => h && /名称|名字|name|人物|角色|技能|物品|道具|描述|核心|标题/i.test(h));
+            }
+            
             if (nameIdx === -1) {
                 // 避开 ID 类的第一列
                 const firstColHeader = (headers[0] || '').toLowerCase();
@@ -429,11 +436,11 @@ export const InnerWorldManager = {
                 color: '#94a3b8',
                 priority: ['当前主要地区', '当前次要地区', '当前详细地点', '上轮场景时间', '经过的时间', '当前时间']
             },
-            { id: 'characters', title: '重要人物', icon: 'fa-solid fa-user-tag', kw: this.tableMapping.characters, rule: 'capsule', color: '#a335ee' },
-            { id: 'skills', title: '战技库', icon: 'fa-solid fa-bolt-lightning', kw: this.tableMapping.skills, rule: 'capsule', color: 'var(--l-main)' },
-            { id: 'items', title: '存储清单', icon: 'fa-solid fa-boxes-stacked', kw: this.tableMapping.inventory, rule: 'capsule', color: '#ffcc00' },
-            { id: 'tasks', title: '目标链路', icon: 'fa-solid fa-scroll', kw: this.tableMapping.tasks, rule: 'capsule', color: '#10b981' },
-            { id: 'locations', title: '地理环境', icon: 'fa-solid fa-map-location-dot', kw: this.tableMapping.locations, rule: 'capsule', color: '#3b82f6' }
+            { id: 'characters', title: '重要人物', icon: 'fa-solid fa-user-tag', kw: this.tableMapping.characters, rule: 'capsule', color: '#a335ee', preferredCol: 1 },
+            { id: 'skills', title: '战技库', icon: 'fa-solid fa-bolt-lightning', kw: this.tableMapping.skills, rule: 'capsule', color: 'var(--l-main)', preferredCol: 1 },
+            { id: 'items', title: '存储清单', icon: 'fa-solid fa-boxes-stacked', kw: this.tableMapping.inventory, rule: 'capsule', color: '#ffcc00', preferredCol: 1 },
+            { id: 'tasks', title: '目标链路', icon: 'fa-solid fa-scroll', kw: this.tableMapping.tasks, rule: 'capsule', color: '#10b981', preferredCol: 1 },
+            { id: 'locations', title: '地理环境', icon: 'fa-solid fa-map-location-dot', kw: this.tableMapping.locations, rule: 'capsule', color: '#3b82f6', preferredCol: 1 }
         ];
 
         let slotHtml = '';
@@ -444,7 +451,7 @@ export const InnerWorldManager = {
             });
             const targetTable = targetId ? db[targetId] : null;
             if (targetTable) {
-                const info = this.extractByRule(targetTable, targetId, slot.rule, 30, slot.priority || []);
+                const info = this.extractByRule(targetTable, targetId, slot.rule, 30, slot.priority || [], slot.preferredCol);
                 if (info && info.length > 0) {
                     const hasWarning = warnings.has(targetId);
                     const warningTxt = hasWarning ? details[targetId].baseName : '';
@@ -1267,10 +1274,10 @@ export const InnerWorldManager = {
         const slots = [
             { title: 'Protagonist Status', kw: this.tableMapping.protagonist, rule: 'kv' },
             { title: 'World Environment', kw: this.tableMapping.global, rule: 'kv' },
-            { title: 'Active Characters', kw: this.tableMapping.characters, rule: 'capsule' },
-            { title: 'Skills/Abilities', kw: this.tableMapping.skills, rule: 'capsule' },
-            { title: 'Inventory/Items', kw: this.tableMapping.inventory, rule: 'capsule' },
-            { title: 'Current Tasks', kw: this.tableMapping.tasks, rule: 'capsule' }
+            { title: 'Active Characters', kw: this.tableMapping.characters, rule: 'capsule', preferredCol: 1 },
+            { title: 'Skills/Abilities', kw: this.tableMapping.skills, rule: 'capsule', preferredCol: 1 },
+            { title: 'Inventory/Items', kw: this.tableMapping.inventory, rule: 'capsule', preferredCol: 1 },
+            { title: 'Current Tasks', kw: this.tableMapping.tasks, rule: 'capsule', preferredCol: 1 }
         ];
 
         let summary = "\n[OMNI-LINK: CORE DATA SUMMARY]\n";
@@ -1286,7 +1293,7 @@ export const InnerWorldManager = {
             });
             
             if (targetId && db[targetId]) {
-                const info = this.extractByRule(db[targetId], targetId, slot.rule, 15);
+                const info = this.extractByRule(db[targetId], targetId, slot.rule, 15, [], slot.preferredCol);
                 if (info && info.length > 0) {
                     hasData = true;
                     summary += `### ${slot.title}:\n`;
