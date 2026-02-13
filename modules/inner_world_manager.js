@@ -189,7 +189,14 @@ export const InnerWorldManager = {
                 </div>
             </div>
         `;
+        
+        // 性能检查：如果 HTML 内容没变，则不更新 DOM，防止闪烁
+        if (container.dataset.lastHtml === html) {
+             return true;
+        }
+
         container.innerHTML = html;
+        container.dataset.lastHtml = html;
         this.bindEvents(container, showBubbleMethod, showStatusMethod);
         return true;
     },
@@ -372,14 +379,14 @@ export const InnerWorldManager = {
             contentHtml = `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">${html}</div>`;
         } else if (rule === 'capsule') {
             const html = info.map(it => `
-                <div class="inner-data-item capsule-item dashboard-pop-trigger" 
+                <div class="${isReadOnly ? '' : 'dashboard-pop-trigger'} inner-data-item capsule-item" 
                      data-slot="${slotId}"
                      data-table-id="${it.tableId}"
                      data-row-index="${it.rowIndex}"
                      data-col-index="${it.colIndex}"
                      data-title="${it.key}" 
                      data-val="${it.value}" 
-                     style="background:rgba(128,128,128,0.1); border:1px solid rgba(128,128,128,0.15); border-radius:12px; padding:2px 8px; font-size:12px; color:inherit; white-space:nowrap; border-left:2px solid ${color}; cursor:pointer; font-weight:bold;">
+                     style="background:rgba(128,128,128,0.1); border:1px solid rgba(128,128,128,0.15); border-radius:12px; padding:2px 8px; font-size:12px; color:inherit; white-space:nowrap; border-left:2px solid ${color}; cursor:${isReadOnly ? 'default' : 'pointer'}; font-weight:bold;">
                     ${it.key}
                 </div>`).join('');
             contentHtml = `<div style="display:flex; flex-wrap:wrap; gap:4px; max-height:100px; overflow-y:auto; padding-right:2px;">${html}</div>`;

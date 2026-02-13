@@ -2102,47 +2102,51 @@ export const UIManager = {
      * 将全域链路概览（汇总看板）注入到聊天正文最后一条 AI 消息下方
      */
     injectEmbeddedDashboard() {
-        if (!userState.injectDashboard) {
-            $('.lilith-embedded-dashboard-container').remove();
-            return;
-        }
-
-        const findLastAiMes = () => {
-            const allMes = document.querySelectorAll('#chat .mes');
-            if (!allMes.length) return null;
-            
-            for (let i = allMes.length - 1; i >= 0; i--) {
-                const el = allMes[i];
-                if (el.getAttribute('is_user') === 'true' || el.getAttribute('is_system') === 'true' || el.classList.contains('sys_mes')) continue;
-                if (getComputedStyle(el).display === 'none') continue;
-                return el;
+        try {
+            if (!userState.injectDashboard) {
+                $('.lilith-embedded-dashboard-container').remove();
+                return;
             }
-            return null;
-        };
 
-        const targetMes = findLastAiMes();
-        if (!targetMes) return;
+            const findLastAiMes = () => {
+                const allMes = document.querySelectorAll('#chat .mes');
+                if (!allMes.length) return null;
+                
+                for (let i = allMes.length - 1; i >= 0; i--) {
+                    const el = allMes[i];
+                    if (el.getAttribute('is_user') === 'true' || el.getAttribute('is_system') === 'true' || el.classList.contains('sys_mes')) continue;
+                    if (getComputedStyle(el).display === 'none') continue;
+                    return el;
+                }
+                return null;
+            };
 
-        const mesBlock = targetMes.querySelector('.mes_block') || targetMes;
-        
-        // 检查是否已经存在
-        let existing = document.querySelector('.lilith-embedded-dashboard-container');
-        
-        // 如果位置不对，移除旧的（确保它始终在最后一条消息）
-        if (existing && existing.parentElement !== mesBlock) {
-            existing.remove();
-            existing = null;
+            const targetMes = findLastAiMes();
+            if (!targetMes) return;
+
+            const mesBlock = targetMes.querySelector('.mes_block') || targetMes;
+            
+            // 检查是否已经存在
+            let existing = document.querySelector('.lilith-embedded-dashboard-container');
+            
+            // 如果位置不对，移除旧的（确保它始终在最后一条消息）
+            if (existing && existing.parentElement !== mesBlock) {
+                existing.remove();
+                existing = null;
+            }
+
+            if (!existing) {
+                existing = document.createElement('div');
+                existing.className = 'lilith-embedded-dashboard-container';
+                existing.style = 'margin-top: 15px; border-top: 1px dashed rgba(255,0,85,0.2); padding-top: 10px; width: 100%; clear: both; box-sizing: border-box;';
+                mesBlock.appendChild(existing);
+            }
+
+            // 渲染看板内容 (全域链路概览)
+            InnerWorldManager.renderDashboardOnly(existing, this.showBubble.bind(this), this.showStatusChange.bind(this));
+        } catch (e) {
+            console.error('[Lilith] Failed to inject dashboard:', e);
         }
-
-        if (!existing) {
-            existing = document.createElement('div');
-            existing.className = 'lilith-embedded-dashboard-container';
-            existing.style = 'margin-top: 15px; border-top: 1px dashed rgba(255,0,85,0.2); padding-top: 10px; width: 100%; clear: both; box-sizing: border-box;';
-            mesBlock.appendChild(existing);
-        }
-
-        // 渲染看板内容 (全域链路概览)
-        InnerWorldManager.renderDashboardOnly(existing, this.showBubble.bind(this), this.showStatusChange.bind(this));
     },
 
     /**

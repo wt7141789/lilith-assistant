@@ -154,7 +154,26 @@ export const EventManager = {
 
                     // 如果消息内容变化（例如在流式传输或被其他脚本修改），确保链路概览还在
                     if (mutation.type === 'characterData' || mutation.type === 'childList') {
-                        const target = mutation.target.closest ? mutation.target.closest('.mes') : (mutation.target.parentElement?.closest ? mutation.target.parentElement.closest('.mes') : null);
+                        // 性能优化：检查变动是否来自汇总看板容器，防止无限渲染循环
+                        const targetNode = mutation.target.nodeType === 3 ? mutation.target.parentElement : mutation.target;
+                        if (targetNode && (targetNode.classList?.contains('lilith-embedded-dashboard-container') || targetNode.closest?.('.lilith-embedded-dashboard-container'))) {
+                            return;
+                        }
+                        
+                        // 检查新增节点中是否包含看板
+                        if (mutation.addedNodes) {
+                            let isOnlyDash = true;
+                            for (let i = 0; i < mutation.addedNodes.length; i++) {
+                                const node = mutation.addedNodes[i];
+                                if (node.nodeType === 1 && !node.classList.contains('lilith-embedded-dashboard-container')) {
+                                    isOnlyDash = false;
+                                    break;
+                                }
+                            }
+                            if (mutation.addedNodes.length > 0 && isOnlyDash) return;
+                        }
+
+                        const target = targetNode?.closest ? targetNode.closest('.mes') : null;
                         if (target && target === document.querySelector('.mes:last-child')) {
                             shouldInject = true;
                         }
