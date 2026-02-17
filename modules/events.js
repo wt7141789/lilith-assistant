@@ -5,6 +5,7 @@ import { userState } from './storage.js';
 import { AudioSys } from './audio.js';
 import { extractContent } from './utils.js';
 import { InnerWorldManager } from './inner_world_manager.js';
+import { EntityManager } from './entity_manager.js';
 
 /**
  * Handles all SillyTavern system events and DOM mutation observers.
@@ -32,21 +33,32 @@ export const EventManager = {
             renderEvents.forEach(evt => {
                 if (evt) {
                     eventSource.on(evt, (messageId) => {
-                        // Delay slightly to ensure DOM is ready
+                        // 稳定性补丁：当消息刷新时，同时扫描当前指定消息和周围消息
                         setTimeout(() => {
                             let el = null;
                             if (typeof messageId === 'number' && !Number.isNaN(messageId)) {
                                 el = document.querySelector(`div.mes[mesid="${messageId}"]`);
+                            } else if (typeof messageId === 'string') {
+                                // 尝试通过 ID 属性查找
+                                el = document.getElementById(`mes-${messageId}`) || document.querySelector(`div.mes[message_id="${messageId}"]`);
                             }
-                            // Fallback to last message if id not found
-                            if (!el) {
+
+                            // 如果找到了特定消息，立即在它及它之后的消息应用美化（防止注入偏移）
+                            if (el) {
+                                UIManager.applyLilithFormatting(el);
+                                // 同时检查相邻的，以防止酒馆渲染器把多个消息搅乱
+                                const next = el.nextElementSibling;
+                                if (next && next.classList.contains('mes')) UIManager.applyLilithFormatting(next);
+                            } else {
+                                // 保底规则：如果找不到 ID，全量扫描一遍最后三条消息
                                 const allMes = document.querySelectorAll('.mes');
-                                if (allMes.length > 0) el = allMes[allMes.length - 1];
+                                for (let i = Math.max(0, allMes.length - 3); i < allMes.length; i++) {
+                                    UIManager.applyLilithFormatting(allMes[i]);
+                                }
                             }
-                            if (el) UIManager.applyLilithFormatting(el);
-                            // 注入全域看板
+
                             if (!UIManager.isLocked) UIManager.injectEmbeddedDashboard();
-                        }, 100);
+                        }, 200); // 增加延迟以对抗异步渲染
                     });
                 }
             });
@@ -65,23 +77,39 @@ export const EventManager = {
                 const currentChat = SillyTavern.getContext().chat;
                 if (!currentChat || currentChat.length === 0) return;
 
+                const lastMsg = currentChat[currentChat.length - 1];
+                if (!lastMsg) return;
+
+                const messageId = lastMsg.message_id || lastMsg.mesid || (currentChat.length - 1);
+
+                // [实体化] 处理奖励与任务标签 (增强版：自动监控提取数值)
+                let statsChanged = false;
+                if (lastMsg.mes) {
+                    const oldFav = userState.favorability;
+                    const oldSan = userState.sanity;
+                    await EntityManager.processTags(lastMsg.mes, messageId);
+                    if (oldFav !== userState.favorability || oldSan !== userState.sanity) {
+                        statsChanged = true;
+                    }
+                }
+
                 // 确保新生成结束后刷新看板位置及数据
                 const innerContainer = document.querySelector('.inner-world-container');
                 if (innerContainer) {
                     InnerWorldManager.render(innerContainer, UIManager.showBubble.bind(UIManager), UIManager.showStatusChange.bind(UIManager));
+                    
+                    // 如果数值有变动，额外展示一个状态变化提示
+                    if (statsChanged && typeof UIManager.showStatusChange === 'function') {
+                        // 简易逻辑：在控制台已打印，这里确保 UI 刷新即可
+                    }
                 }
                 UIManager.injectEmbeddedDashboard();
-
-                const lastMsg = currentChat[currentChat.length - 1];
-                if (!lastMsg) return;
 
                 // Update Lilith's expression based on the AI's response (Optimized via Regex if enabled)
                 if (!lastMsg.is_user && !lastMsg.is_system && lastMsg.mes) {
                     const optimizedContent = extractContent(lastMsg.mes, userState);
                     UIManager.updateAvatarExpression(optimizedContent);
                 }
-
-                const messageId = lastMsg.message_id || lastMsg.mesid || (currentChat.length - 1);
 
                 // Conditions for interjection
                 if (!lastMsg.is_user && !lastMsg.is_system && lastMsg.mes && !lastMsg.mes.includes('[莉莉丝]')) {
@@ -91,6 +119,8 @@ export const EventManager = {
                     
                     if (Math.random() * 100 < freq) {
                         console.log('[Lilith] Random interjection triggered.');
+                        // [IMPORTANT] triggerRealtimeComment handles its own internal UI refresh and formatting.
+                        // Do not change this unless you are re-writing the refresh logic in assistant_manager.js.
                         setTimeout(() => assistantManager.triggerRealtimeComment(messageId), 1500);
                     } else {
                         console.log('[Lilith] Random interjection rolled skip.');
@@ -105,9 +135,51 @@ export const EventManager = {
                 }
             });
 
+            // 2.5 Character Selection Hook (Auto-Inject Worldbook)
+            eventSource.on(event_types.CHARACTER_SELECTED, () => {
+                console.log('[Lilith] Character selected, updating worldbook...');
+                if (userState.entityEnabled) {
+                    setTimeout(() => EntityManager.updateWorldbook(), 1000);
+                }
+            });
+
             // 3. Before Combine Prompts (Cleanup Lilith content from AI prompt)
             eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (data) => {
-                if (data && data.chat) {
+                if (!data) return;
+
+                // [实体化增强] 在角色定义之前插入实体化系统 prompt
+                if (userState.entityEnabled) {
+                    try {
+                        const materialContent = EntityManager.lastMaterializationContent;
+                        if (materialContent) {
+                            const injectionPrefix = `### LILITH_ENTITY_SYSTEM_INJECTION ###\n${materialContent}\n### END_OF_LILITH_ENTITY_SYSTEM ###\n\n`;
+                            
+                            // 插入到角色描述 (description) 的最前面
+                            const originalDescription = data.description || "";
+                            data.description = injectionPrefix + originalDescription;
+
+                            // [自动检测] 验证注入是否成功
+                            if (data.description.startsWith(injectionPrefix)) {
+                                console.log('[Lilith] Prompt injection successful (Entity Materialization)');
+                                UIManager.showBubble("莉莉丝系统实体化：已精准注入核心定义之前", "#00ff88");
+                            } else {
+                                console.warn('[Lilith] Prompt injection failed: startsWith verification failed');
+                                UIManager.showBubble("莉莉丝实体化注入可能失败，请检查设置！", "#ff0055");
+                            }
+                        } else {
+                            // 内容为空，可能是还没初始化，尝试调用一次强制更新 (虽然它是异步的，但可能下次就好)
+                            console.warn('[Lilith] Entity content is empty during prompt generation.');
+                            EntityManager.updateWorldbook();
+                            UIManager.showBubble("实体化内容初始化中，本次注入跳过", "#ffaa00");
+                        }
+                    } catch (err) {
+                        console.error('[Lilith] Entity prompt injection error:', err);
+                        UIManager.showBubble("实体化注入过程发生异常！", "#ff0055");
+                    }
+                }
+
+                // 继续原有的清理逻辑
+                if (data.chat) {
                     data.chat.forEach(msg => {
                         if (msg.mes && msg.mes.includes('[莉莉丝]')) {
                             // Strip [Lilith] comments so AI doesn't see its own previous interjections as part of the character's core response

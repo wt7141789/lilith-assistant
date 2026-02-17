@@ -21,7 +21,13 @@ export function getExtensionSettings() {
 
 export function saveExtensionSettings() {
     const context = getSTContext();
-    if (context) context.saveSettingsDebounced();
+    if (context) {
+        // [新增] 动态同步上下文名称，确保在切换 Persona 时实时更新
+        if (context.name1) {
+            userState.userName = context.name1;
+        }
+        context.saveSettingsDebounced();
+    }
 }
 
 export const userState = {};
@@ -98,6 +104,16 @@ export function validateState() {
     if (!settings.personaData[currentP]) {
         console.log(`[Lilith] Creating default data for persona: ${currentP}`);
         settings.personaData[currentP] = JSON.parse(JSON.stringify(DEFAULT_STATE));
+    } else {
+        // [新增] 确保实体化相关字段存在
+        const pData = settings.personaData[currentP];
+        if (pData.entityEnabled === undefined) pData.entityEnabled = false;
+        if (pData.taskSystemEnabled === undefined) pData.taskSystemEnabled = false;
+        if (pData.combatAssistEnabled === undefined) pData.combatAssistEnabled = false;
+        if (pData.playerAwareness === undefined) pData.playerAwareness = true;
+        if (pData.lastInjectedStats === undefined) pData.lastInjectedStats = { sanity: 0, favorability: 0 };
+        if (pData.lastProcessedMessageId === undefined) pData.lastProcessedMessageId = null;
+        if (pData.selectedWorldbookEntries === undefined) pData.selectedWorldbookEntries = [];
     }
 
     // 4. Sync to Live State

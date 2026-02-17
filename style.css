@@ -895,6 +895,20 @@ div.lilith-chat-ui:hover {
     background: rgba(255,255,255,0.07);
 }
 .cfg-group label { display: block; margin-bottom: 8px; font-size: 13px; }
+
+.cfg-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    transition: 0.2s;
+}
+.cfg-item:hover { background: rgba(255, 255, 255, 0.06); }
+.cfg-item span { color: #ccc; }
 .lilith-select, .lilith-input {
     width: 100%; padding: 8px; background: #000; border: 1px solid #333; color: #fff;
     border-radius: 4px; font-family: var(--l-font);

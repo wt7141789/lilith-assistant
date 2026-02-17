@@ -4,6 +4,7 @@ import { userState, validateState, panelChatHistory } from './modules/storage.js
 import { UIManager } from './modules/ui_manager.js';
 import { assistantManager } from './modules/assistant_manager.js';
 import { EventManager } from './modules/events.js';
+import { EntityManager } from './modules/entity_manager.js';
 import { AudioSys } from './modules/audio.js';
 import { UpdateManager } from './modules/update_manager.js';
 
@@ -18,6 +19,12 @@ async function boot() {
 
     // 1. Validate and finalize state
     validateState();
+
+    // 1.5 Initialize Entity Manager
+    EntityManager.assistant = assistantManager;
+    if (userState.entityEnabled) {
+        EntityManager.updateWorldbook();
+    }
 
     // 2. Sync API config from stored settings if available
     if (userState.apiConfig) {

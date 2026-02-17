@@ -5,6 +5,7 @@ import { AudioSys } from './audio.js';
 import { createSmartRegExp, extractContent } from './utils.js';
 import { UpdateManager } from './update_manager.js';
 import { InnerWorldManager } from './inner_world_manager.js';
+import { EntityManager } from './entity_manager.js';
 
 export const UIManager = {
     assistant: null, // To be set in index.js to avoid circular dependency
@@ -91,6 +92,55 @@ export const UIManager = {
         else this.setAvatar('normal');
     },
 
+    /**
+     * [新增] 刷新并显示世界书条目勾选列表
+     */
+    async refreshWorldbookDisplay() {
+        const container = document.getElementById('lilith-worldbook-entries');
+        if (!container) return;
+
+        container.innerHTML = '<div style="text-align:center; padding:10px; color:var(--l-cyan);">正在扫描深度记忆与世界书...</div>';
+        
+        try {
+            const entries = await EntityManager.getAvailableWorldbookEntries();
+            if (entries.length === 0) {
+                container.innerHTML = '<div style="text-align:center; padding:10px; color:#666;">（未找到绑定的世界书或条目为空）</div>';
+                return;
+            }
+
+            container.innerHTML = entries.map(e => {
+                const checked = (userState.selectedWorldbookEntries || []).includes(e.uid) ? 'checked' : '';
+                return `
+                    <div class="wb-entry-item" style="display:flex; align-items:center; gap:8px; padding:4px; border-bottom:1px solid rgba(255,255,255,0.05); font-size:12px;">
+                        <input type="checkbox" class="wb-entry-check" data-uid="${e.uid}" ${checked} style="width:auto; margin:0;">
+                        <span style="color:#eee; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${e.comment}">${e.comment}</span>
+                        <span style="color:#555; font-size:10px; cursor:help;" title="${e.content.substring(0, 200)}...">📄</span>
+                    </div>
+                `;
+            }).join('');
+
+            // 绑定勾选事件
+            container.querySelectorAll('.wb-entry-check').forEach(cb => {
+                cb.addEventListener('change', (evt) => {
+                    const uid = evt.target.dataset.uid;
+                    if (!userState.selectedWorldbookEntries) userState.selectedWorldbookEntries = [];
+                    
+                    if (evt.target.checked) {
+                        if (!userState.selectedWorldbookEntries.includes(uid)) {
+                            userState.selectedWorldbookEntries.push(uid);
+                        }
+                    } else {
+                        userState.selectedWorldbookEntries = userState.selectedWorldbookEntries.filter(id => id !== uid);
+                    }
+                    saveState();
+                    console.log('[Lilith] 更新选中的世界书条目:', userState.selectedWorldbookEntries);
+                });
+            });
+        } catch (err) {
+            container.innerHTML = `<div style="text-align:center; padding:10px; color:#ff0055;">扫描失败: ${err.message}</div>`;
+        }
+    },
+
     // --- UI 构造 ---
     initStruct() {
         if (document.getElementById(containerId)) return;
@@ -146,6 +196,10 @@ export const UIManager = {
         ['mousedown', 'touchstart', 'click'].forEach(evt => panel.addEventListener(evt, e => e.stopPropagation()));
         
         const muteIcon = AudioSys.muted ? '🔇' : '🔊';
+        const currentPersona = userState.activePersona || 'toxic';
+        const stContext = (typeof SillyTavern !== 'undefined') ? SillyTavern.getContext() : null;
+        const personaName = stContext ? (stContext.name1 || '用户') : '用户';
+        
         panel.innerHTML = `
             <div class="lilith-panel-header">
                 <span class="lilith-title">莉莉丝助手 (LILITH ASSISTANT) <span style="font-size:10px; color:var(--l-cyan);">v3.0.8-杂鱼专用版-❤</span></span>
@@ -162,6 +216,7 @@ export const UIManager = {
             <div class="lilith-tabs" style="${userState.isInnerWorld ? 'display:none;' : ''}">
                 <div class="lilith-tab active" data-target="chat">😈 互动</div>
                 <div class="lilith-tab" data-target="tools">🔪 功能</div>
+                <div class="lilith-tab" data-target="entity" style="color:#00ff88;">🧬 实体化</div>
                 <div class="lilith-tab" data-target="memory" style="color:#bd00ff;">🧠 记忆</div>
                 <div class="lilith-tab" data-target="gacha" style="color:var(--l-gold);">🎲 赌狗</div>
                 <div class="lilith-tab" data-target="config">⚙️ 设置</div>
@@ -182,6 +237,9 @@ export const UIManager = {
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
                         </div>
+                        <div style="font-size: 10px; color: #666; margin-top: 5px; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 2px;">
+                            <span>当前身份: <strong style="color:var(--l-cyan);">${personaName}</strong></span>
+                        </div>
                     </div>
                 </div>
                 <div id="page-tools" class="lilith-page">
@@ -196,6 +254,53 @@ export const UIManager = {
                         <button class="tool-btn" id="tool-ghost" style="grid-column: span 2; border-color:#00f3ff;">👻 替你回复 (计费)</button>
                     </div>
                     <div id="tool-output-area"></div>
+                </div>
+                <div id="page-entity" class="lilith-page">
+                    <div class="cfg-group">
+                        <label style="color:#00ff88; font-weight:bold;">🧬 实体化核心控制</label>
+                        <div class="cfg-item" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>启用实体化功能</span>
+                            <input type="checkbox" id="cfg-entity-enabled" ${userState.entityEnabled ? 'checked' : ''} style="width:auto;">
+                        </div>
+                        <div class="cfg-item" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>启用莉莉丝任务系统</span>
+                            <input type="checkbox" id="cfg-task-enabled" ${userState.taskSystemEnabled ? 'checked' : ''} style="width:auto;">
+                        </div>
+                        <div class="cfg-item" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>启用战斗力辅助</span>
+                            <input type="checkbox" id="cfg-combat-enabled" ${userState.combatAssistEnabled ? 'checked' : ''} style="width:auto;">
+                        </div>
+                        <div class="cfg-item" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                            <span>唯我莉莉丝 (唯我感知)</span>
+                            <input type="checkbox" id="cfg-player-aware" ${userState.playerAwareness ? 'checked' : ''} style="width:auto;">
+                        </div>
+                        <button id="btn-start-entity" class="tool-btn" style="width:100%; border-color:#00ff88; color:#00ff88; height:36px; font-weight:bold; margin-top:10px;">🚀 启动实体化</button>
+                        <button id="btn-disable-entity" class="tool-btn" style="width:100%; border-color:#ff0055; color:#ff0055; height:36px; font-weight:bold; margin-top:10px;">🚫 彻底关闭并清理实体化</button>
+                    </div>
+                    <div class="cfg-group">
+                        <label style="color:var(--l-gold); font-weight:bold;">📊 系统同步状态</label>
+                        <div style="font-size:12px; color:#aaa; padding:10px; background:rgba(0,0,0,0.3); border-radius:5px; margin-bottom:10px;">
+                            世界书文件: <span style="color:var(--l-cyan);">莉莉丝实体化系统</span><br>
+                            上次同步理智: <span id="sync-san-val" style="color:#00e5ff;">${userState.lastInjectedStats.sanity}</span><br>
+                            上次同步好感: <span id="sync-fav-val" style="color:#ff0055;">${userState.lastInjectedStats.favorability}</span>
+                        </div>
+                        <button id="btn-force-inject" class="tool-btn" style="width:100%; border-color:#00ff88; color:#00ff88; height:36px; font-weight:bold;">⚡ 立即强制同步世界书</button>
+                    </div>
+                    <div style="background:rgba(0,229,255,0.1); border:1px solid #00e5ff33; padding:8px; border-radius:5px; margin:10px 0; font-size:11px; color:#00e5ff; line-height:1.4;">
+                        💡 <strong>生成建议：</strong>为了获得最精准的实体化文档，建议使用 <strong>Gemini 1.5 Pro</strong>, <strong>Gemini 2.5 Pro</strong> 或 <strong>Gemini 3.0 Pro</strong> 等 AI 模型进行生成。
+                    </div>
+                    <div class="cfg-group">
+                        <label style="color:#00e5ff; font-weight:bold;">📖 人设契合度 (世界书参考)</label>
+                        <div style="font-size:11px; color:#888; margin-bottom:8px;">选择条目以使实体化莉莉丝更符合角色背景：</div>
+                        <div id="lilith-worldbook-entries" style="max-height:150px; overflow-y:auto; background:rgba(0,0,0,0.2); border:1px solid #333; border-radius:4px; padding:5px;">
+                            <div style="text-align:center; padding:10px; color:#666;">（点击下方按钮扫描条目）</div>
+                        </div>
+                        <button id="btn-refresh-worldbook" class="tool-btn" style="width:100%; border-color:#00e5ff; color:#00e5ff; height:30px; margin-top:5px; font-size:11px;">🔍 扫描并刷新可用条目</button>
+                    </div>
+                    <div style="padding:10px; font-size:11px; color:#888; line-height:1.4; border-top:1px solid #333; margin-top:10px;">
+                        * 自动逻辑：理智或好感变化超过 10 点会自动触发重写。<br>
+                        * 任务同步：支持解析 [莉莉丝任务] 及 [莉莉丝奖励] 标签。
+                    </div>
                 </div>
                 <div id="page-memory" class="lilith-page">
                     <div style="padding: 15px 15px 0 15px; flex-shrink: 0;">
@@ -443,13 +548,19 @@ export const UIManager = {
         // Tabs
         p.querySelectorAll('.lilith-tab').forEach(tab => {
             tab.addEventListener('click', () => {
+                const targetName = tab.dataset.target;
                 p.querySelectorAll('.lilith-tab').forEach(t => t.classList.remove('active'));
                 p.querySelectorAll('.lilith-page').forEach(pg => pg.classList.remove('active'));
                 tab.classList.add('active');
-                const target = document.getElementById(`page-${tab.dataset.target}`);
+                const target = document.getElementById(`page-${targetName}`);
                 if (target) {
                     target.classList.add('active');
                     target.scrollTop = 0; 
+                }
+
+                // [新增] 切换到实体化页面时，自动扫描一次
+                if (targetName === 'entity') {
+                    this.refreshWorldbookDisplay();
                 }
             });
         });
@@ -785,6 +896,90 @@ export const UIManager = {
             if(confirm("确定要强制压缩当前对话为记忆吗？")) assistant.checkAndSummarize(window, true);
         });
 
+        // --- 实体化控制 (Entity Manager) ---
+        document.getElementById('cfg-entity-enabled')?.addEventListener('change', async (e) => {
+            userState.entityEnabled = e.target.checked;
+            saveState();
+        });
+
+        document.getElementById('cfg-task-enabled')?.addEventListener('change', (e) => {
+            userState.taskSystemEnabled = e.target.checked;
+            saveState();
+        });
+
+        document.getElementById('cfg-combat-enabled')?.addEventListener('change', (e) => {
+            userState.combatAssistEnabled = e.target.checked;
+            saveState();
+        });
+
+        document.getElementById('cfg-player-aware')?.addEventListener('change', (e) => {
+            userState.playerAwareness = e.target.checked;
+            saveState();
+        });
+
+        // [新增] 世界书刷新按钮监听
+        document.getElementById('btn-refresh-worldbook')?.addEventListener('click', () => {
+            this.refreshWorldbookDisplay();
+        });
+
+        document.getElementById('btn-start-entity')?.addEventListener('click', async () => {
+            const context = SillyTavern.getContext();
+            if (!context.characterId) {
+                this.showBubble("我都没地方下脚，你有毛病吗？废物！", "#ff0055");
+                return;
+            }
+
+            if (!userState.entityEnabled) {
+                this.showBubble("你连开关都没开，启动个屁啊！", "#ff0055");
+                return;
+            }
+
+            this.showBubble("正在实体化，都给我让让！", "#00ff88");
+            const result = await EntityManager.updateWorldbook();
+            
+            if (result === 'success') {
+                const sanVal = document.getElementById('sync-san-val');
+                const favVal = document.getElementById('sync-fav-val');
+                if (sanVal) sanVal.textContent = userState.lastInjectedStats.sanity;
+                if (favVal) favVal.textContent = userState.lastInjectedStats.favorability;
+                this.showBubble("🧬 莉莉丝实体化成功：已注入世界书并同步状态数据！", "#00ff88");
+            } else {
+                this.showBubble("🚫 实体化执行失败，请检查模型连接或控制台日志！", "#ff0055");
+            }
+        });
+
+        document.getElementById('btn-disable-entity')?.addEventListener('click', async () => {
+            if (confirm('确定要彻底禁用并清理莉莉丝实体化吗？这将从酒馆世界书中删除莉莉丝的相关条目。')) {
+                this.showBubble("滚就滚，谁稀罕待在你这破意识空间里...", "#ff0055");
+                await EntityManager.disableEntity();
+                
+                // 更新页面上可能的显示状态
+                const sanVal = document.getElementById('sync-san-val');
+                const favVal = document.getElementById('sync-fav-val');
+                if (sanVal) sanVal.textContent = '-';
+                if (favVal) favVal.textContent = '-';
+            }
+        });
+
+        document.getElementById('btn-force-inject')?.addEventListener('click', async () => {
+            const context = SillyTavern.getContext();
+            if (!context.characterId) {
+                this.showBubble("我都没地方下脚，你有毛病吗？废物！", "#ff0055");
+                return;
+            }
+
+            this.showBubble("正在实体化，都给我让让！", "#00ff88");
+            const result = await EntityManager.updateWorldbook();
+            
+            if (result === 'success') {
+                // 更新 UI 上显示的快照值
+                const sanVal = document.getElementById('sync-san-val');
+                const favVal = document.getElementById('sync-fav-val');
+                if (sanVal) sanVal.textContent = userState.lastInjectedStats.sanity;
+                if (favVal) favVal.textContent = userState.lastInjectedStats.favorability;
+            }
+        });
+
         // Config Page - Floating Panel Logic
         // These events apply to the elements inside the Floating Panel (#page-config)
         const bindSharedConfigEvents = () => {
@@ -796,6 +991,11 @@ export const UIManager = {
                     
                     // Switch state and data for the new persona
                     switchPersonaState(newPersona);
+                    
+                    // [实体化同步] 切换人格后如果是开启状态，同步刷新世界书
+                    if (userState.entityEnabled) {
+                        EntityManager.updateWorldbook();
+                    }
                     
                     if (PERSONA_DB[userState.activePersona]) {
                          userState.ttsConfig = { ...PERSONA_DB[userState.activePersona].voice };

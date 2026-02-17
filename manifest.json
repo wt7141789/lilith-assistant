@@ -4,8 +4,8 @@
     "js": "index.js",
     "css": "style.css",
     "author": "User",
-    "version": "v3.0.8-杂鱼专用版-❤",
-    "description": "人格化的莉莉丝助手 [v3.0.8-杂鱼专用版-❤] - 调整初始化数值平衡，增加异常保护熔断机制。",
+    "version": "v3.1.0-杂鱼专用版-❤",
+    "description": "人格化的莉莉丝助手 [v3.1.0-杂鱼专用版-❤] - 调整初始化数值平衡，增加异常保护熔断机制。",
     "auto_update": true,
     "homePage": ""
 }

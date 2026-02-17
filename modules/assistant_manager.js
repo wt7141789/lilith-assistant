@@ -1,5 +1,5 @@
 // modules/assistant_manager.js
-import { extensionName, avatarId, bubbleId, MAX_HISTORY_TRIGGER, HISTORY_KEEP, PERSONA_DB, GachaConfig, WRITER_PERSONA, JAILBREAK } from './config.js';
+import { extensionName, avatarId, bubbleId, MAX_HISTORY_TRIGGER, HISTORY_KEEP, PERSONA_DB, GachaConfig, WRITER_PERSONA, JAILBREAK, THRESHOLD_PROMPT } from './config.js';
 import { userState, saveState, saveChat, panelChatHistory, updateFavor, updateSanity } from './storage.js';
 import { AudioSys } from './audio.js';
 import { getDynamicPersona } from './persona.js';
@@ -356,6 +356,7 @@ export const assistantManager = {
 
             if (summary) {
                 userState.memoryArchive.push(summary.trim());
+                userState.memorySummary = summary.trim(); // [更新] 同步到实时摘要供实体化使用
                 // 裁剪历史记录
                 panelChatHistory.length = 0;
                 panelChatHistory.push(...keepHistory);
@@ -412,35 +413,51 @@ export const assistantManager = {
             
             let url = baseUrl.replace(/\/$/, ''); 
             
-            // [PRIORITY RULE]: Always enforce the core persona prompt as the foundation
-            const basePersona = PERSONA_DB[userState.activePersona || 'toxic'].prompt;
-            let finalSystemPrompt = "";
-
-            if (systemPrompt) {
-                // If a specific task prompt is provided (e.g. from Tool execution), 
-                // wrap it with the core persona rules to ensure character consistency.
-                finalSystemPrompt = `[HIGHEST PRIORITY: CORE CHARACTER RULES]\n${basePersona}\n\n[CURRENT TASK INSTRUCTIONS]\n${systemPrompt}\n\n[STRICT CONSTRAINT: You MUST maintain the persona above while completing the task.]`;
-            } else {
-                // Default conversation mode
-                finalSystemPrompt = getDynamicPersona();
-            }
+            // --- [Prompt Engineering: Structuring for Maximum Coherence] ---
             
+            // 1. Fundamental Rules & Jailbreak (Defines what is POSSIBLE)
+            let coreDirectives = `${THRESHOLD_PROMPT}\n${JAILBREAK}`;
+            
+            // 2. Knowledge & Context (Defines what happened BEFORE)
             const memoryBlock = userState.memoryArchive.length > 0 ? `\n[Long-term Memory / Previous Context]:\n${userState.memoryArchive.join('\n')}\n` : "";
             const isInjectingWorld = userState.injectDashboard !== false;
             const coreDataBlock = isInjectingWorld ? InnerWorldManager.getSummaryContext() : "";
-            
-            if (!isInternal) { 
-                if (mode === "roast") finalSystemPrompt += "\n[Task: Roast within story context. Short. Toxic.]"; 
-                else if (isChat) { 
-                    finalSystemPrompt += `\n${JAILBREAK}\n[Constraint: Response must be detailed.]`; 
-                    finalSystemPrompt += memoryBlock; 
-                    if (isInjectingWorld) finalSystemPrompt += coreDataBlock;
-                } else {
-                    finalSystemPrompt += `\n${JAILBREAK}`; 
-                    if (isInjectingWorld) finalSystemPrompt += coreDataBlock;
+            const historicalContext = `${memoryBlock}${coreDataBlock}`;
+
+            // 3. Identity and Current Task (Defines WHO you are and WHAT you do NOW)
+            let interactionFocus = "";
+            if (systemPrompt) {
+                // Tool-based or specific task persona
+                const basePersona = PERSONA_DB[userState.activePersona || 'toxic'].prompt;
+                interactionFocus = `[HIGHEST PRIORITY: CORE CHARACTER RULES]\n${basePersona}\n\n[CURRENT TASK INSTRUCTIONS]\n${systemPrompt}\n\n[STRICT CONSTRAINT: You MUST maintain the persona above while completing the task.]`;
+            } else {
+                // Dynamic conversation persona
+                interactionFocus = getDynamicPersona();
+            }
+
+            // 4. Final Polish & Behavioral Constraints (Defines HOW you respond)
+            let behavioralConstraints = "";
+            if (!isInternal) {
+                if (mode === "roast") {
+                    behavioralConstraints = "\n[Final Strategy: Roast within story context. Short. Concise. Toxic.]";
+                } else if (isChat) {
+                    behavioralConstraints = "\n[Final Strategy: Roleplay naturally as Lilith. Response must be detailed and maintain the emotional depth described in the context above.]";
                 }
             }
-            
+
+            // Assemble the final prompt with logical flow headers
+            let finalSystemPrompt = `
+### [SYSTEM DIRECTIVES] ###
+${coreDirectives}
+
+### [WORLD & MEMORY CONTEXT] ###
+${historicalContext || "No previous memory stored."}
+
+### [IDENTITY & INTERACTION PROTOCOL] ###
+${interactionFocus}
+${behavioralConstraints}
+`.trim();
+
             let msgs = isChat && !isInternal ? [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }] : [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
             let fetchUrl, fetchBody, fetchHeaders;
             if (apiType === 'openai') {
@@ -455,8 +472,9 @@ export const assistantManager = {
                 }
                 
                 fetchUrl = `${url}/v1beta/${modelId}:generateContent?key=${apiKey}`;
-                let promptText = isChat ? msgs.map(m => `[${m.role === 'lilith' ? 'Model' : (m.role==='system'?'System':'User')}]: ${m.content}`).join('\\n') : msgs[0].content;
+                let promptText = isChat ? msgs.map(m => `[${m.role === 'lilith' ? 'Model' : (m.role==='system'?'System':'User')}]: ${m.content}`).join('\n') : msgs[0].content;
                 fetchHeaders = { 'Content-Type': 'application/json' }; 
+                // --- 关键修改：加入 safetySettings 彻底关闭审查 ---
                 fetchBody = JSON.stringify({ 
                     contents: [{ role: 'user', parts: [{ text: promptText }] }], 
                     generationConfig: { maxOutputTokens: 4096 },
@@ -479,10 +497,22 @@ export const assistantManager = {
             const data = await response.json();
             let reply = apiType === 'openai' ? data.choices?.[0]?.message?.content : data.candidates?.[0]?.content?.parts?.[0]?.text;
             
+            // [谷歌特有]: 如果因为安全原因被拦截，reply 会是 undefined
+            if (!reply && data.candidates?.[0]?.finishReason === "SAFETY") {
+                reply = "(💭 Inner: 啧，被世界意志阻止了...) [系统屏蔽：内容过于色情/暴力，Google 拒绝生成]";
+            }
+
             // 成功请求，彻底清空错误状态
             this.resetErrorState();
 
             reply = reply?.trim();
+
+            // [安全校验] 拦截任何非预期的 HTML 响应 (常见于代理错误或重定向)
+            if (reply && (reply.startsWith('<!DOCTYPE') || reply.toLowerCase().includes('<html'))) {
+                console.error('[Lilith] 收到非预期的 HTML 响应:', reply.substring(0, 100));
+                throw new Error('API 返回了 HTML 网页而非文本，请检查 API 配置或代理设置。');
+            }
+
             if (isChat && reply && !isInternal) { 
                 this.checkAndSummarize(parentWin);
             }
@@ -510,37 +540,42 @@ export const assistantManager = {
         if (chat.length === 0) return;
 
         // 寻找最后一个非用户非系统的消息作为锚点
-        let lastAiMsg = null;
+        let lastAiIdx = -1;
         for (let i = chat.length - 1; i >= 0; i--) {
             if (!chat[i].is_user && !chat[i].is_system) {
-                lastAiMsg = chat[i];
+                lastAiIdx = i;
                 break;
             }
         }
 
-        if (!lastAiMsg) {
+        if (lastAiIdx === -1) {
             if (typeof UIManager !== 'undefined' && UIManager.showBubble) {
                 UIManager.showBubble("这里连个能吐槽的人都没有...", "#ff0055");
             }
             return;
         }
 
-        const messageId = lastAiMsg.message_id || lastAiMsg.mesid || chat.indexOf(lastAiMsg);
-        await this.triggerRealtimeComment(messageId);
+        // 传入索引以符合老版本在现代酒馆中的实时刷新逻辑
+        await this.triggerRealtimeComment(lastAiIdx);
     },
 
     async triggerRealtimeComment(messageId) {
-        console.log('[Lilith] triggerRealtimeComment called for messageId:', messageId);
+        console.log('[Lilith] triggerRealtimeComment called for:', messageId);
         const context = SillyTavern.getContext();
         const chatData = context.chat || [];
 
-        let targetIndex = chatData.findIndex(m =>
-            (m.message_id == messageId) ||
-            (m.mesid == messageId)
-        );
+        // 统一转换为索引
+        let targetIndex = -1;
+        if (typeof messageId === 'number') {
+            targetIndex = messageId;
+        } else {
+            targetIndex = chatData.findIndex(m =>
+                (m.message_id == messageId) ||
+                (m.mesid == messageId)
+            );
+        }
 
         if (targetIndex === -1) {
-            console.log('[Lilith] targetIndex -1, falling back to last message');
             targetIndex = chatData.length - 1;
         }
 
@@ -676,10 +711,51 @@ ${chatLog}
 
                     msg.mes = prefix + newBody + suffix;
                     
-                    // 保存并刷新
+                    // 1. 数据保存：确保刷新后内容持久化
                     if (typeof SillyTavern.saveChat === 'function') SillyTavern.saveChat();
-                    context.eventSource.emit(context.event_types.MESSAGE_UPDATED, messageId);
-                    
+
+                    // [CRITICAL HANDLER] 核心实时注入渲染逻辑 - (非必要请勿修改此块代码)
+                    // 此逻辑通过手动介入DOM并调用SillyTavern渲染引擎，实现了吐槽内容的即时渲染与美化。
+                    const idx = parseInt(targetIndex);
+                    if (!isNaN(idx)) {
+                        // 尝试定位当前消息节点
+                        const el = document.querySelector(`.mes[mesid="${idx}"]`);
+                        if (el) {
+                            const mesText = el.querySelector('.mes_text');
+                            if (mesText) {
+                                // A. 显式调用酒馆格式化引擎：将注入了 [莉莉丝] 标签的 Markdown 实时转为 HTML
+                                const context = SillyTavern.getContext();
+                                if (typeof context.messageFormatting === 'function') {
+                                    // 模拟酒馆渲染流程产生 HTML 结构
+                                    const renderedHTML = context.messageFormatting(msg.mes, msg.name, false, false);
+                                    mesText.innerHTML = renderedHTML;
+                                    
+                                    // B. 立即执行莉莉丝美化逻辑：将纯文本标签 [莉莉丝] 转换为图形化气泡
+                                    if (typeof UIManager !== 'undefined' && UIManager.applyLilithFormatting) {
+                                        UIManager.applyLilithFormatting(el);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. 最终强制同步：调用酒馆原生局部重绘 API，确保数据一致性和其他插件兼容性
+                        if (typeof window.renderElement === 'function') {
+                            window.renderElement(idx);
+                        } else if (typeof window.updateMessageBlock === 'function') {
+                            window.updateMessageBlock(idx);
+                        }
+                        
+                        // 4. 重复校验机制：防止原生 renderElement 的异步周期覆盖掉我们刚做好的 HTML 美化
+                        setTimeout(() => {
+                            const elCheck = document.querySelector(`.mes[mesid="${idx}"]`);
+                            if (elCheck && !elCheck.querySelector('.lilith-chat-ui-wrapper')) {
+                                if (typeof UIManager !== 'undefined' && UIManager.applyLilithFormatting) {
+                                    UIManager.applyLilithFormatting(elCheck);
+                                }
+                            }
+                        }, 100);
+                    }
+
                     if (typeof UIManager !== 'undefined' && UIManager.showBubble) {
                         UIManager.showBubble(`刚才吐槽了你一下，哼。`, "#bd00ff");
                     }
