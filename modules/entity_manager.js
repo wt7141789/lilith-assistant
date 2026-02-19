@@ -341,45 +341,94 @@ ${userState.playerAwareness ? `- 感知范围：【唯我感知 (Exclusive Lilit
 
         const persona = PERSONA_DB[userState.activePersona] || { name: '未知' };
         
-        // 1. 尝试 AI 生成内容
-        let content = await this.generateAIContent();
 
-        // 2. 如果 AI 生成失败，使用符合固定结构的冗余模板
-        if (!content) {
-            const combatPower = Math.floor((userState.sanity + userState.favorability) / 2);
-            content = `【核心身份】
-- 名称：莉莉丝 (Lilith)
-- 类别：莉莉丝系统实体化插件 / 毒舌系统精灵
-
-【背景故事】
-以系统形式寄居于宿主意识中，作为契约者的观察者与引导者存在。基于当前环境与世界规则，其干涉行为已深度序列化。当前理智值：${userState.sanity}。
-
-【外貌描写】
-拥有诱人的魅魔姿态，深紫色竖瞳，黑色卷发，身后有灵活的心形尾巴。其存在感将随理智值降低而产生物理现实的异化侵蚀。
-
-【性格特征】
-- 混合特质：莉莉丝魅魔本性与 [${persona.name}] 的深度融合。
-- 处事原则：在理智值 ${userState.sanity} 下表现为极度的支配欲与观测热诚。
-
-【目标动机】
-结合 [${charData.name || '宿主'}] 的背景设定，莉莉丝旨在通过收集宿主的高熵情感数据，最终达成跨维度的意识同化。
-
-${userState.taskSystemEnabled ? `【特殊能力 - 任务引擎】
-- 系统职能：莉莉丝是交互式任务分发系统。她会通过意识链接实时发布具有强制力或诱惑力的任务指令。
-- 规范：发布任务必须使用 \`[莉莉丝任务]\` 标签，结算奖励必须使用 \`[莉莉丝奖励] 好感度+X，理智值+Y，PF+Z [/莉莉丝任务]\`。` : ""}
-
-${userState.combatAssistEnabled ? `【特殊能力 - 战斗辅助】
-- [战斗力同调]：基于该世界的逻辑基础，莉莉丝已锁定宿主战斗系统，当前动态补强系数：${(combatPower/100 + 0.5).toFixed(1)}x（受好感/理智实时偏移影响）。` : ""}
-
-【关系与感知】
-- 宿主：${context.name1 || '用户'} (作为系统与宿主的共生关系)
-- 感知模式：${userState.playerAwareness ? "【唯我感知】只有宿主（玩家）可以看见并听见莉莉丝。" : "【公开感知】场景中所有人均能感知并与之互动。"}
-
-[系统警告]
-莉莉丝正持续监测宿主的理智与好感，并根据实时环境在正文中生成动态任务。奖励需严格闭环：[莉莉丝奖励] 好感度+X，理智值+Y，PF+Z [/莉莉丝任务]`;
+        // 1. 读取现有世界书内容（如有），分段保存
+        let oldSections = {};
+        let oldContent = null;
+        let bookName = null;
+        let isLinked = false;
+        const context = SillyTavern.getContext();
+        const character = context.characters?.[context.characterId];
+        bookName = character?.data?.extensions?.world || character?.world_info_id;
+        if (!bookName) {
+            const getChatBookFn = context.getOrCreateChatWorldbook || window.getOrCreateChatWorldbook;
+            if (typeof getChatBookFn === 'function') {
+                const chatBookName = await getChatBookFn();
+                if (chatBookName) bookName = chatBookName;
+            }
+        }
+        if (!bookName) bookName = this.BOOK_NAME;
+        try {
+            const token = window.token || context.token;
+            const resp = await fetch('/api/worldinfo/get', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+                body: JSON.stringify({ name: bookName })
+            });
+            if (resp.ok) {
+                const bookData = await resp.json();
+                if (bookData && bookData.entries) {
+                    for (const gid in bookData.entries) {
+                        const e = bookData.entries[gid];
+                        if (e.comment === '莉莉丝实体化系统' || e.name === '莉莉丝实体化系统' || e.comment?.includes('Lilith_System')) {
+                            oldContent = e.content;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (e) {}
+        if (oldContent) {
+            // 按【标题】分段
+            const sectionRegex = /【([^】]+)】([\s\S]*?)(?=\n【|$)/g;
+            let m;
+            while ((m = sectionRegex.exec(oldContent)) !== null) {
+                oldSections[m[1].trim()] = m[0];
+            }
         }
 
-        // [核心改进] 无论是否生成成功，均缓存最后一次的内容供直接注入使用
+        // 2. 只让AI生成【性格特征】【目标动机】【特殊能力 - 任务引擎】【特殊能力 - 战斗辅助】
+        // 其余段落直接复用 oldSections
+        let aiSections = await this.generateAIContent();
+        // 若AI返回的是全段内容，按同样方式分段
+        let aiSectionMap = {};
+        if (aiSections) {
+            const sectionRegex = /【([^】]+)】([\s\S]*?)(?=\n【|$)/g;
+            let m;
+            while ((m = sectionRegex.exec(aiSections)) !== null) {
+                aiSectionMap[m[1].trim()] = m[0];
+            }
+        }
+
+        // 3. 拼接最终内容
+        const sectionOrder = [
+            '核心身份',
+            '背景故事',
+            '外貌描写',
+            '穿着风格',
+            '性格特征',
+            '目标动机',
+            '特殊能力 - 任务引擎',
+            '特殊能力 - 战斗辅助',
+            '关系定义'
+        ];
+        let content = '';
+        for (const sec of sectionOrder) {
+            if (['性格特征','目标动机','特殊能力 - 任务引擎','特殊能力 - 战斗辅助'].includes(sec)) {
+                if (aiSectionMap[sec]) {
+                    content += aiSectionMap[sec].trim() + '\n\n';
+                } else if (oldSections[sec]) {
+                    content += oldSections[sec].trim() + '\n\n';
+                }
+            } else {
+                if (oldSections[sec]) {
+                    content += oldSections[sec].trim() + '\n\n';
+                } else if (aiSectionMap[sec]) {
+                    content += aiSectionMap[sec].trim() + '\n\n';
+                }
+            }
+        }
+        content = content.trim();
         this.lastMaterializationContent = content;
 
         try {

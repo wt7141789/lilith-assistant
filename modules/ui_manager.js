@@ -202,7 +202,7 @@ export const UIManager = {
         
         panel.innerHTML = `
             <div class="lilith-panel-header">
-                <span class="lilith-title">莉莉丝助手 (LILITH ASSISTANT) <span style="font-size:10px; color:var(--l-cyan);">v3.0.8-杂鱼专用版-❤</span></span>
+                <span class="lilith-title">莉莉丝助手 (LILITH ASSISTANT) <span style="font-size:10px; color:var(--l-cyan);">v3.1.0-杂鱼专用版-❤</span></span>
                     <div style="display:flex; align-items:center; gap:12px; padding: 5px;">
                         <span id="lilith-world-toggle" title="触达莉莉丝的最核心" style="cursor:pointer; font-size:18px; padding: 4px; display: inline-block;">${userState.isInnerWorld ? '🌟' : '👁️'}</span>
                         <span id="lilith-mute-btn" title="语音开关" style="cursor:pointer; font-size:18px; padding: 4px; display: inline-block;">${muteIcon}</span>
