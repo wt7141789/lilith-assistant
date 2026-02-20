@@ -1866,6 +1866,15 @@ export const UIManager = {
         if (save) {
             panelChatHistory.push({ role: role, content: optimizedText });
             saveChat();
+
+            // 如果是内部对话（例如莉莉丝回复），也尝试解析奖励/任务标签
+            try {
+                // 使用原始文本（包含标签）进行解析
+                EntityManager.processTags(text).then(() => {
+                    // 解析后刷新 UI 显示
+                    try { UIManager.updateUI(); } catch (e) {}
+                }).catch(() => {});
+            } catch (e) {}
         }
     },
 
