@@ -651,8 +651,8 @@ ${userState.playerAwareness ? `- 感知范围：【唯我感知 (Exclusive Lilit
      * 处理消息中的奖励和任务标签
      * [已增强] 自动监控提取酒馆正文的好感和理智提升
      */
-    async processTags(message, messageId = null) {
-        if (!userState.entityEnabled) return;
+    async processTags(message, messageId = null, force = false) {
+        if (!userState.entityEnabled && !force) return;
 
         // 防止重复处理同一条消息
         if (messageId !== null && userState.lastProcessedMessageId === messageId) {
