@@ -664,8 +664,8 @@ ${userState.playerAwareness ? `- 感知范围：【唯我感知 (Exclusive Lilit
         let deltaSan = 0;
         let deltaPF = 0;
 
-        // 1. 匹配标准标签 [莉莉丝奖励]奖励内容[/莉莉丝任务]
-        const rewardRegex = /\[莉莉丝奖励\]([\s\S]*?)\[\/莉莉丝任务\]/g;
+        // 1. 匹配标准标签 [莉莉丝奖励]奖励内容[/莉莉丝奖励] 或 较早版本可能用 [/莉莉丝任务]
+        const rewardRegex = /\[莉莉丝奖励\]([\s\S]*?)\[\/(?:莉莉丝任务|莉莉丝奖励)\]/g;
         let tagMatch;
         while ((tagMatch = rewardRegex.exec(message)) !== null) {
             const rewardText = tagMatch[1];
