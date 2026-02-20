@@ -347,7 +347,6 @@ ${userState.playerAwareness ? `- 感知范围：【唯我感知 (Exclusive Lilit
         let oldContent = null;
         let bookName = null;
         let isLinked = false;
-        const context = SillyTavern.getContext();
         const character = context.characters?.[context.characterId];
         bookName = character?.data?.extensions?.world || character?.world_info_id;
         if (!bookName) {
