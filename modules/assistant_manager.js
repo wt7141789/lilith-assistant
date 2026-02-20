@@ -458,7 +458,27 @@ ${interactionFocus}
 ${behavioralConstraints}
 `.trim();
 
-            let msgs = isChat && !isInternal ? [{ role: 'system', content: finalSystemPrompt }, ...panelChatHistory, { role: 'user', content: text }] : [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
+            // Normalize roles from panelChatHistory to API-acceptable values
+            const normalizeRole = (r, apiType) => {
+                if (!r) return 'user';
+                const lr = String(r).toLowerCase();
+                // For OpenAI: allowed are system/user/assistant
+                if (apiType === 'openai') {
+                    if (lr === 'system') return 'system';
+                    if (lr === 'lilith' || lr === 'assistant') return 'assistant';
+                    return 'user';
+                }
+                // For other/native providers, default to user (we do not forward custom role tokens)
+                return 'user';
+            };
+
+            let msgs = null;
+            if (isChat && !isInternal) {
+                const normalizedHistory = panelChatHistory.map(m => ({ role: normalizeRole(m.role, this.config.apiType), content: m.content }));
+                msgs = [{ role: 'system', content: finalSystemPrompt }, ...normalizedHistory, { role: 'user', content: text }];
+            } else {
+                msgs = [{ role: 'user', content: finalSystemPrompt + "\n" + text }];
+            }
             let fetchUrl, fetchBody, fetchHeaders;
             if (apiType === 'openai') {
                 if (!url.endsWith('/v1')) url += '/v1'; 
